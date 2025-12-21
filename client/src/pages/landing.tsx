@@ -1,6 +1,9 @@
-import { Rocket, Shield, Zap, Users } from "lucide-react";
+import { Rocket, Shield, Zap, Users, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 const features = [
   {
@@ -21,19 +24,51 @@ const features = [
 ];
 
 export default function Landing() {
+  const [, setLocation] = useLocation();
+  
+  const { data: devModeData } = useQuery<{ isDevelopment: boolean }>({
+    queryKey: ["/api/dev-mode"],
+  });
+
+  const testLoginMutation = useMutation({
+    mutationFn: async (role: string) => {
+      const response = await apiRequest("POST", "/api/test-login", { role });
+      return response.json();
+    },
+    onSuccess: () => {
+      setLocation("/");
+      window.location.reload();
+    },
+  });
+
+  const isDevelopment = devModeData?.isDevelopment ?? false;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
               <Rocket className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold" data-testid="text-logo">Nisuwa Cartel SRP</span>
           </div>
-          <Button asChild data-testid="button-login">
-            <a href="/api/login">Log In with EVE</a>
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {isDevelopment && (
+              <Button 
+                variant="outline" 
+                onClick={() => testLoginMutation.mutate("member")}
+                disabled={testLoginMutation.isPending}
+                data-testid="button-test-login"
+              >
+                <FlaskConical className="mr-2 h-4 w-4" />
+                Test Login
+              </Button>
+            )}
+            <Button asChild data-testid="button-login">
+              <a href="/api/login">Log In with EVE</a>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -51,6 +86,18 @@ export default function Landing() {
               <Button size="lg" asChild data-testid="button-get-started">
                 <a href="/api/login">Log In with EVE Online</a>
               </Button>
+              {isDevelopment && (
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  onClick={() => testLoginMutation.mutate("member")}
+                  disabled={testLoginMutation.isPending}
+                  data-testid="button-test-login-hero"
+                >
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Test Login (Dev)
+                </Button>
+              )}
             </div>
           </div>
         </section>

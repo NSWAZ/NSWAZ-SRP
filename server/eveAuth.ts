@@ -234,6 +234,67 @@ export async function setupAuth(app: Express) {
       res.redirect("/");
     });
   });
+
+  // Test login route - ONLY available in development mode
+  app.post("/api/test-login", async (req: Request, res: Response) => {
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    
+    if (!isDevelopment) {
+      return res.status(403).json({ message: "Test login is only available in development mode" });
+    }
+
+    try {
+      const { role } = req.body;
+      const testRole = role || "member";
+      
+      // Create or find test user
+      const testCharacterId = 12345678;
+      const testCharacterName = `TestUser_${testRole}`;
+      
+      let [existingUser] = await db.select()
+        .from(users)
+        .where(eq(users.characterId, testCharacterId))
+        .limit(1);
+
+      let userId: string;
+
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const [newUser] = await db.insert(users).values({
+          characterId: testCharacterId,
+          characterName: testCharacterName,
+          corporationId: 98000001,
+          allianceId: 99000001,
+          profileImageUrl: `https://images.evetech.net/characters/${testCharacterId}/portrait?size=64`,
+        }).returning();
+        userId = newUser.id;
+      }
+
+      // Set session
+      req.session.userId = userId;
+      req.session.characterId = testCharacterId;
+      req.session.characterName = testCharacterName;
+      req.session.tokenExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+
+      res.json({ 
+        success: true, 
+        message: "Test login successful",
+        user: {
+          id: userId,
+          characterName: testCharacterName,
+        }
+      });
+    } catch (error) {
+      console.error("Test login error:", error);
+      res.status(500).json({ message: "Test login failed" });
+    }
+  });
+
+  // Check if app is in development mode
+  app.get("/api/dev-mode", (req: Request, res: Response) => {
+    res.json({ isDevelopment: process.env.NODE_ENV !== "production" });
+  });
 }
 
 export const isAuthenticated: RequestHandler = async (req: Request, res: Response, next) => {
