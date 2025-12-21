@@ -184,7 +184,6 @@ export async function setupAuth(app: Express) {
       response_type: "code",
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: "publicData",
       state: state,
     });
 
