@@ -32,7 +32,7 @@ export default function Landing() {
             <span className="text-xl font-bold" data-testid="text-logo">Nisuwa Cartel SRP</span>
           </div>
           <Button asChild data-testid="button-login">
-            <a href="/api/login">Log In</a>
+            <a href="/api/login">Log In with EVE</a>
           </Button>
         </div>
       </header>
@@ -49,7 +49,7 @@ export default function Landing() {
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <Button size="lg" asChild data-testid="button-get-started">
-                <a href="/api/login">Get Started</a>
+                <a href="/api/login">Log In with EVE Online</a>
               </Button>
             </div>
           </div>
@@ -80,11 +80,11 @@ export default function Landing() {
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl font-bold" data-testid="text-cta-title">Ready to Submit Your Request?</h2>
             <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-              Log in with your Replit account to start submitting SRP requests and tracking
+              Log in with your EVE Online account to start submitting SRP requests and tracking
               your reimbursements.
             </p>
             <Button size="lg" className="mt-8" asChild data-testid="button-cta-login">
-              <a href="/api/login">Log In Now</a>
+              <a href="/api/login">Log In with EVE Online</a>
             </Button>
           </div>
         </section>

@@ -16,13 +16,8 @@ export function UserMenu() {
 
   if (!user) return null;
 
-  const initials = [user.firstName, user.lastName]
-    .filter(Boolean)
-    .map((n) => n?.[0])
-    .join("")
-    .toUpperCase() || "U";
-
-  const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
+  const displayName = user.characterName || "Pilot";
+  const initials = displayName.substring(0, 2).toUpperCase();
 
   return (
     <DropdownMenu>
@@ -38,9 +33,9 @@ export function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none" data-testid="text-user-name">{displayName}</p>
-            {user.email && (
-              <p className="text-xs leading-none text-muted-foreground" data-testid="text-user-email">
-                {user.email}
+            {user.characterId && (
+              <p className="text-xs leading-none text-muted-foreground" data-testid="text-character-id">
+                Character ID: {user.characterId}
               </p>
             )}
           </div>

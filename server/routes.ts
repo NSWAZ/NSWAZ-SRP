@@ -1,7 +1,7 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./eveAuth";
 import { insertSrpRequestSchema, insertShipTypeSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -14,9 +14,9 @@ export async function registerRoutes(
   registerAuthRoutes(app);
 
   // Get current user's role
-  app.get("/api/user/role", isAuthenticated, async (req: any, res) => {
+  app.get("/api/user/role", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -58,9 +58,9 @@ export async function registerRoutes(
   });
 
   // Ship types - admin only
-  app.post("/api/ship-types", isAuthenticated, async (req: any, res) => {
+  app.post("/api/ship-types", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const userRole = await storage.getUserRole(userId);
       
       if (!userRole || !["admin", "fc"].includes(userRole.role)) {
@@ -79,9 +79,9 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/ship-types/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/ship-types/:id", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const userRole = await storage.getUserRole(userId);
       
       if (!userRole || !["admin", "fc"].includes(userRole.role)) {
@@ -106,9 +106,9 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/ship-types/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/ship-types/:id", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const userRole = await storage.getUserRole(userId);
       
       if (!userRole || !["admin", "fc"].includes(userRole.role)) {
@@ -130,9 +130,9 @@ export async function registerRoutes(
   });
 
   // SRP Requests - user's own requests (recent for dashboard)
-  app.get("/api/srp-requests/my/recent", isAuthenticated, async (req: any, res) => {
+  app.get("/api/srp-requests/my/recent", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const requests = await storage.getSrpRequests(userId);
       res.json(requests.slice(0, 5));
     } catch (error) {
@@ -142,9 +142,9 @@ export async function registerRoutes(
   });
 
   // SRP Requests - user's own requests (all)
-  app.get("/api/srp-requests/my", isAuthenticated, async (req: any, res) => {
+  app.get("/api/srp-requests/my", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const requests = await storage.getSrpRequests(userId);
       res.json(requests);
     } catch (error) {
@@ -154,9 +154,9 @@ export async function registerRoutes(
   });
 
   // SRP Requests - all requests (admin only)
-  app.get("/api/srp-requests/all/:status?", isAuthenticated, async (req: any, res) => {
+  app.get("/api/srp-requests/all/:status?", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const userRole = await storage.getUserRole(userId);
       
       if (!userRole || !["admin", "fc"].includes(userRole.role)) {
@@ -173,9 +173,9 @@ export async function registerRoutes(
   });
 
   // Get single request
-  app.get("/api/srp-requests/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/srp-requests/:id", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const { id } = req.params;
       
       const request = await storage.getSrpRequest(id);
@@ -200,9 +200,9 @@ export async function registerRoutes(
   });
 
   // Create SRP request
-  app.post("/api/srp-requests", isAuthenticated, async (req: any, res) => {
+  app.post("/api/srp-requests", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       
       const validated = insertSrpRequestSchema.parse(req.body);
       const request = await storage.createSrpRequest(userId, validated);
@@ -217,9 +217,9 @@ export async function registerRoutes(
   });
 
   // Review SRP request (approve/deny) - admin only
-  app.patch("/api/srp-requests/:id/review", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/srp-requests/:id/review", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       const userRole = await storage.getUserRole(userId);
       
       if (!userRole || !["admin", "fc"].includes(userRole.role)) {
@@ -247,9 +247,9 @@ export async function registerRoutes(
   });
 
   // Make first user admin (bootstrap endpoint)
-  app.post("/api/admin/bootstrap", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/bootstrap", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.session.userId!;
       
       // Check if any admin exists
       const existingRole = await storage.getUserRole(userId);
