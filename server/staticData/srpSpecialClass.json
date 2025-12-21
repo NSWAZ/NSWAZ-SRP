@@ -1,16 +1,5 @@
 {
   "version": "2025-12-21",
   "description": "Special ship classes that receive 100% SRP payout even for solo",
-  "specialClasses": [
-    "Frigate",
-    "Assault Frigate",
-    "Covert Ops",
-    "Electronic Attack Ship",
-    "Interceptor",
-    "Logistics Frigate",
-    "Destroyer",
-    "Command Destroyer",
-    "Interdictor",
-    "Tactical Destroyer"
-  ]
+  "specialClasses": ["Frigate", "Destroyer"]
 }
