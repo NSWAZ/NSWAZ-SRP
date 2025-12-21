@@ -2,9 +2,17 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./eveAuth";
-import { insertSrpRequestSchema } from "@shared/schema";
+import { insertSrpRequestSchema, srpCalculateSchema, type SrpCalculateResponse } from "@shared/schema";
 import { z } from "zod";
 import { shipCatalogService } from "./services/shipCatalog";
+
+// SRP Policy constants
+const SRP_POLICY = {
+  FLEET_MULTIPLIER: 1.0,
+  SOLO_MULTIPLIER: 0.5,
+  SPECIAL_ROLE_BONUS: 0.2,
+  MAX_PAYOUT_MILLIONS: 5000,
+};
 
 interface ZKillmailData {
   killmail_id: number;
@@ -204,6 +212,41 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error parsing killmail:", error);
       res.status(500).json({ message: "킬메일 파싱에 실패했습니다" });
+    }
+  });
+
+  // Calculate SRP payout
+  app.post("/api/killmail/calculate", isAuthenticated, async (req: Request, res) => {
+    try {
+      const validated = srpCalculateSchema.parse(req.body);
+      const { iskValue, operationType, isSpecialRole } = validated;
+
+      const baseValue = iskValue;
+      const operationMultiplier = operationType === "fleet" 
+        ? SRP_POLICY.FLEET_MULTIPLIER 
+        : SRP_POLICY.SOLO_MULTIPLIER;
+      const specialRoleBonus = isSpecialRole ? SRP_POLICY.SPECIAL_ROLE_BONUS : 0;
+
+      let finalAmount = Math.round(baseValue * operationMultiplier * (1 + specialRoleBonus));
+      finalAmount = Math.min(finalAmount, SRP_POLICY.MAX_PAYOUT_MILLIONS);
+
+      const response: SrpCalculateResponse = {
+        estimatedPayout: finalAmount,
+        breakdown: {
+          baseValue,
+          operationMultiplier,
+          specialRoleBonus,
+          finalAmount,
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Error calculating SRP:", error);
+      res.status(500).json({ message: "SRP 계산에 실패했습니다" });
     }
   });
 

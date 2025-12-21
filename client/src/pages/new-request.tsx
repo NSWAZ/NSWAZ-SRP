@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { z } from "zod";
-import { Loader2, HelpCircle, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { Loader2, HelpCircle, CheckCircle2, AlertCircle, ExternalLink, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,6 +18,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +28,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { SrpCalculateResponse } from "@shared/schema";
 
 interface ParsedKillmail {
   killmailId: number;
@@ -42,10 +46,20 @@ const formSchema = z.object({
     (url) => url.includes("zkillboard.com"),
     "URL은 zKillboard에서 가져와야 합니다"
   ),
-  fleetName: z.string().min(1, "함대명을 입력해주세요"),
-  fcName: z.string().min(1, "FC 이름을 입력해주세요"),
+  operationType: z.enum(["solo", "fleet"]),
+  isSpecialRole: z.boolean().default(false),
+  fleetName: z.string().optional(),
+  fcName: z.string().optional(),
   lossDescription: z.string().min(10, "최소 10자 이상의 설명을 입력해주세요"),
-});
+}).refine(
+  (data) => {
+    if (data.operationType === "fleet") {
+      return data.fleetName && data.fleetName.length > 0 && data.fcName && data.fcName.length > 0;
+    }
+    return true;
+  },
+  { message: "플릿 운용시 함대명과 FC 이름을 입력해주세요", path: ["fleetName"] }
+);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -54,16 +68,24 @@ export default function NewRequest() {
   const { toast } = useToast();
   const [parsedData, setParsedData] = useState<ParsedKillmail | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [calculatedPayout, setCalculatedPayout] = useState<SrpCalculateResponse | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       killmailUrl: "",
+      operationType: "fleet",
+      isSpecialRole: false,
       fleetName: "",
       fcName: "",
       lossDescription: "",
     },
   });
+
+  const operationType = form.watch("operationType");
+  const isSpecialRole = form.watch("isSpecialRole");
+  const killmailUrl = form.watch("killmailUrl");
 
   const parseMutation = useMutation({
     mutationFn: async (url: string) => {
@@ -77,6 +99,20 @@ export default function NewRequest() {
     onError: (error: Error) => {
       setParsedData(null);
       setParseError(error.message || "킬메일 파싱에 실패했습니다");
+      setCalculatedPayout(null);
+    },
+  });
+
+  const calculateMutation = useMutation({
+    mutationFn: async (data: { shipTypeId: number; iskValue: number; operationType: string; isSpecialRole: boolean }) => {
+      const response = await apiRequest("POST", "/api/killmail/calculate", data);
+      return response.json() as Promise<SrpCalculateResponse>;
+    },
+    onSuccess: (data) => {
+      setCalculatedPayout(data);
+    },
+    onError: () => {
+      setCalculatedPayout(null);
     },
   });
 
@@ -86,10 +122,15 @@ export default function NewRequest() {
         throw new Error("킬메일 정보를 먼저 파싱해주세요");
       }
       return apiRequest("POST", "/api/srp-requests", {
-        ...data,
+        killmailUrl: data.killmailUrl,
         shipTypeId: parsedData.shipTypeId,
         shipTypeName: parsedData.shipTypeName,
         iskAmount: parsedData.iskValue,
+        operationType: data.operationType,
+        isSpecialRole: data.isSpecialRole ? 1 : 0,
+        fleetName: data.operationType === "fleet" ? data.fleetName : null,
+        fcName: data.operationType === "fleet" ? data.fcName : null,
+        lossDescription: data.lossDescription,
       });
     },
     onSuccess: () => {
@@ -110,12 +151,40 @@ export default function NewRequest() {
     },
   });
 
-  const handleUrlBlur = () => {
-    const url = form.getValues("killmailUrl");
-    if (url && url.includes("zkillboard.com/kill/")) {
-      parseMutation.mutate(url);
+  // Debounced killmail URL parsing
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-  };
+
+    if (killmailUrl && killmailUrl.includes("zkillboard.com/kill/")) {
+      debounceTimerRef.current = setTimeout(() => {
+        parseMutation.mutate(killmailUrl);
+      }, 500);
+    } else {
+      setParsedData(null);
+      setParseError(null);
+      setCalculatedPayout(null);
+    }
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [killmailUrl]);
+
+  // Calculate payout when parsed data or options change
+  useEffect(() => {
+    if (parsedData) {
+      calculateMutation.mutate({
+        shipTypeId: parsedData.shipTypeId,
+        iskValue: parsedData.iskValue,
+        operationType,
+        isSpecialRole,
+      });
+    }
+  }, [parsedData, operationType, isSpecialRole]);
 
   const onSubmit = (data: FormValues) => {
     if (!parsedData) {
@@ -135,6 +204,8 @@ export default function NewRequest() {
     }
     return `${millions.toLocaleString()}M ISK`;
   };
+
+  const isParsing = parseMutation.isPending;
 
   return (
     <div className="max-w-2xl">
@@ -183,25 +254,29 @@ export default function NewRequest() {
                       </Tooltip>
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="https://zkillboard.com/kill/..."
-                        data-testid="input-killmail-url"
-                        {...field}
-                        onBlur={(e) => {
-                          field.onBlur();
-                          handleUrlBlur();
-                        }}
-                      />
+                      <div className="relative">
+                        <Input
+                          placeholder="https://zkillboard.com/kill/..."
+                          data-testid="input-killmail-url"
+                          disabled={isParsing}
+                          {...field}
+                        />
+                        {isParsing && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
                     </FormControl>
                     <FormDescription>
-                      URL 입력 후 바깥을 클릭하면 자동으로 정보를 가져옵니다
+                      URL 입력 후 자동으로 정보를 가져옵니다
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {parseMutation.isPending && (
+              {isParsing && (
                 <div className="flex items-center gap-2 text-muted-foreground" data-testid="status-parsing">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>킬메일 정보 가져오는 중...</span>
@@ -251,43 +326,104 @@ export default function NewRequest() {
                 </Card>
               )}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="fleetName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>함대명</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="예: 방어 플릿"
-                          data-testid="input-fleet-name"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={form.control}
+                name="operationType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>운용 유형</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex gap-4"
+                        data-testid="radio-operation-type"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="fleet" id="fleet" data-testid="radio-fleet" />
+                          <Label htmlFor="fleet" className="cursor-pointer">플릿</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="solo" id="solo" data-testid="radio-solo" />
+                          <Label htmlFor="solo" className="cursor-pointer">솔로잉</Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormDescription>
+                      {operationType === "solo" 
+                        ? "솔로잉은 플릿 대비 50% 보상" 
+                        : "플릿 운용은 100% 보상"}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="fcName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>FC 이름</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="함대 사령관 이름"
-                          data-testid="input-fc-name"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {operationType === "fleet" && (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="fleetName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>함대명</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="예: 방어 플릿"
+                              data-testid="input-fleet-name"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="fcName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>FC 이름</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="함대 사령관 이름"
+                              data-testid="input-fc-name"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="isSpecialRole"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start gap-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-special-role"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="cursor-pointer">
+                            특수롤 (Logi, Tackle, Scout 등)
+                          </FormLabel>
+                          <FormDescription>
+                            특수롤 수행시 20% 추가 보상
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
 
               <FormField
                 control={form.control}
@@ -311,10 +447,28 @@ export default function NewRequest() {
                 )}
               />
 
+              {calculatedPayout && parsedData && (
+                <Card className="bg-primary/5 border-primary/20" data-testid="card-calculated-payout">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calculator className="h-5 w-5 text-primary" />
+                      <span className="font-medium">예상 SRP 지급액</span>
+                    </div>
+                    <div className="text-2xl font-bold text-primary" data-testid="text-estimated-payout">
+                      {formatIsk(calculatedPayout.estimatedPayout)}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-2">
+                      {operationType === "fleet" ? "플릿 (100%)" : "솔로잉 (50%)"}
+                      {isSpecialRole && operationType === "fleet" && " + 특수롤 보너스 (20%)"}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="flex gap-3">
                 <Button
                   type="submit"
-                  disabled={submitMutation.isPending || !parsedData}
+                  disabled={submitMutation.isPending || !parsedData || isParsing}
                   data-testid="button-submit"
                 >
                   {submitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -9,6 +9,7 @@ export * from "./models/auth";
 // Enums for SRP system
 export const userRoleEnum = pgEnum("user_role", ["member", "fc", "admin"]);
 export const srpStatusEnum = pgEnum("srp_status", ["pending", "approved", "denied", "processing"]);
+export const operationTypeEnum = pgEnum("operation_type", ["solo", "fleet"]);
 
 // User roles table (3NF - separate entity for role assignments)
 export const userRoles = pgTable("user_roles", {
@@ -27,6 +28,8 @@ export const srpRequests = pgTable("srp_requests", {
   shipTypeName: text("ship_type_name"),
   killmailUrl: text("killmail_url").notNull(),
   iskAmount: integer("isk_amount").notNull(),
+  operationType: operationTypeEnum("operation_type").notNull().default("fleet"),
+  isSpecialRole: integer("is_special_role").notNull().default(0),
   lossDescription: text("loss_description"),
   fleetName: text("fleet_name"),
   fcName: text("fc_name"),
@@ -34,6 +37,7 @@ export const srpRequests = pgTable("srp_requests", {
   reviewerId: varchar("reviewer_id"),
   reviewerNote: text("reviewer_note"),
   payoutAmount: integer("payout_amount"),
+  estimatedPayout: integer("estimated_payout"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
@@ -55,19 +59,40 @@ export const insertSrpRequestSchema = createInsertSchema(srpRequests).omit({
   reviewerId: true,
   reviewerNote: true,
   payoutAmount: true,
+  estimatedPayout: true,
   status: true,
 });
 
 // Extended validation schema for SRP request form
-export const srpRequestFormSchema = insertSrpRequestSchema.extend({
+export const srpRequestFormSchema = z.object({
   killmailUrl: z.string().url("올바른 킬메일 URL을 입력해주세요").refine(
-    (url) => url.includes("zkillboard.com") || url.includes("esi.evetech.net"),
-    "URL은 zKillboard 또는 EVE ESI에서 가져와야 합니다"
+    (url) => url.includes("zkillboard.com"),
+    "URL은 zKillboard에서 가져와야 합니다"
   ),
+  shipTypeId: z.number().min(1),
+  shipTypeName: z.string().optional(),
   iskAmount: z.number().min(1, "ISK 금액은 최소 1백만 이상이어야 합니다"),
+  operationType: z.enum(["solo", "fleet"]),
+  isSpecialRole: z.number().default(0),
+  fleetName: z.string().optional(),
+  fcName: z.string().optional(),
   lossDescription: z.string().min(10, "최소 10자 이상의 설명을 입력해주세요"),
-  fleetName: z.string().min(1, "함대명을 입력해주세요"),
-  fcName: z.string().min(1, "FC 이름을 입력해주세요"),
+}).refine(
+  (data) => {
+    if (data.operationType === "fleet") {
+      return data.fleetName && data.fleetName.length > 0 && data.fcName && data.fcName.length > 0;
+    }
+    return true;
+  },
+  { message: "플릿 운용시 함대명과 FC 이름을 입력해주세요", path: ["fleetName"] }
+);
+
+// SRP calculation request schema
+export const srpCalculateSchema = z.object({
+  shipTypeId: z.number(),
+  iskValue: z.number(),
+  operationType: z.enum(["solo", "fleet"]),
+  isSpecialRole: z.boolean().default(false),
 });
 
 // Ship data type (from EVE SDE catalog)
@@ -91,6 +116,17 @@ export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 export type SrpRequest = typeof srpRequests.$inferSelect;
 export type InsertSrpRequest = z.infer<typeof insertSrpRequestSchema>;
 export type SrpRequestFormData = z.infer<typeof srpRequestFormSchema>;
+export type SrpCalculateRequest = z.infer<typeof srpCalculateSchema>;
+
+export type SrpCalculateResponse = {
+  estimatedPayout: number;
+  breakdown: {
+    baseValue: number;
+    operationMultiplier: number;
+    specialRoleBonus: number;
+    finalAmount: number;
+  };
+};
 
 // Extended types for frontend display
 export type SrpRequestWithDetails = SrpRequest & {
