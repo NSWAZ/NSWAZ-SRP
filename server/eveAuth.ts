@@ -42,6 +42,7 @@ declare module "express-session" {
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const isProduction = process.env.NODE_ENV === "production";
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -56,7 +57,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
+      sameSite: "lax",
       maxAge: sessionTtl,
     },
   });
@@ -77,6 +79,7 @@ async function exchangeCodeForToken(code: string, redirectUri: string): Promise<
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code: code,
+      redirect_uri: redirectUri,
     }),
   });
 

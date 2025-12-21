@@ -34,12 +34,13 @@ Preferred communication style: Simple, everyday language.
 - **Migrations**: Managed via `drizzle-kit push`
 
 ### Authentication
-- **Provider**: Replit Auth (OpenID Connect)
+- **Provider**: EVE Online SSO (OAuth 2.0 Authorization Code flow)
 - **Session Storage**: PostgreSQL-backed sessions via connect-pg-simple
-- **Session Management**: Express-session with secure cookies
+- **Session Management**: Express-session with secure cookies and CSRF protection
+- **Token Refresh**: Automatic access token refresh using refresh tokens
 
 ### Key Database Tables
-- `users` - User accounts (managed by Replit Auth)
+- `users` - User accounts with EVE character data (characterId, characterName, corporationId, allianceId)
 - `sessions` - Session storage for authentication
 - `user_roles` - Role assignments (member, fc, admin)
 - `ship_types` - Ship definitions with categories and base ISK values
@@ -54,15 +55,22 @@ Preferred communication style: Simple, everyday language.
 
 ### Core Services
 - **PostgreSQL Database**: Primary data store (provision via Replit Database)
-- **Replit Auth**: Authentication provider using OpenID Connect
+- **EVE Online SSO**: Authentication provider using OAuth 2.0
 
 ### Third-Party APIs
+- **EVE Online SSO**: Character authentication (https://login.eveonline.com)
 - **zKillboard/EVE ESI**: Killmail URL validation for SRP requests
+
+### Required Environment Variables
+- `EVE_CLIENT_ID`: EVE Developer Portal application Client ID
+- `EVE_CLIENT_SECRET`: EVE Developer Portal application Secret Key
+- `SESSION_SECRET`: Session encryption secret
+- `DATABASE_URL`: PostgreSQL connection string
 
 ### Key npm Packages
 - `drizzle-orm` / `drizzle-kit`: Database ORM and migration tools
 - `express` / `express-session`: Web server and session management
-- `passport` / `openid-client`: Authentication handling
+- `connect-pg-simple`: PostgreSQL session storage
 - `@tanstack/react-query`: Client-side data fetching and caching
 - `zod`: Schema validation (shared between client and server)
 - `@radix-ui/*`: Accessible UI component primitives
