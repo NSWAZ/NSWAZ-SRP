@@ -188,6 +188,102 @@ async function parseTypes(filePath: string): Promise<Map<number, TypeRecord>> {
   return result;
 }
 
+interface SrpLimitsTier {
+  name: string;
+  maxPayout: number;
+  classes: string[];
+}
+
+interface SrpLimitsData {
+  version: string;
+  description: string;
+  tiers: SrpLimitsTier[];
+}
+
+function validateSrpLimits(groupIndex: Record<string, number[]>) {
+  const srpLimitsPath = path.join(process.cwd(), "server/staticData/srpLimits.json");
+  
+  if (!fs.existsSync(srpLimitsPath)) {
+    console.log("\n⚠️  srpLimits.json not found, skipping validation");
+    return;
+  }
+  
+  console.log("\n=== Validating srpLimits.json ===");
+  
+  const srpLimits: SrpLimitsData = JSON.parse(fs.readFileSync(srpLimitsPath, "utf-8"));
+  const catalogGroupNames = new Set(Object.keys(groupIndex));
+  
+  // Build map of class -> tiers
+  const classToTiers: Record<string, string[]> = {};
+  const allDefinedClasses = new Set<string>();
+  
+  for (const tier of srpLimits.tiers) {
+    for (const className of tier.classes) {
+      allDefinedClasses.add(className);
+      if (!classToTiers[className]) {
+        classToTiers[className] = [];
+      }
+      classToTiers[className].push(tier.name);
+    }
+  }
+  
+  let hasErrors = false;
+  
+  // Check 1: All catalog group names should be defined in srpLimits
+  const missingFromLimits: string[] = [];
+  for (const groupName of catalogGroupNames) {
+    if (!allDefinedClasses.has(groupName)) {
+      missingFromLimits.push(groupName);
+    }
+  }
+  
+  if (missingFromLimits.length > 0) {
+    hasErrors = true;
+    console.log("\n❌ Classes in catalog but NOT defined in srpLimits.json:");
+    for (const name of missingFromLimits.sort()) {
+      console.log(`   - ${name}`);
+    }
+  }
+  
+  // Check 2: Each class should only be in one tier
+  const duplicateTiers: Array<{ className: string; tiers: string[] }> = [];
+  for (const [className, tiers] of Object.entries(classToTiers)) {
+    if (tiers.length > 1) {
+      duplicateTiers.push({ className, tiers });
+    }
+  }
+  
+  if (duplicateTiers.length > 0) {
+    hasErrors = true;
+    console.log("\n❌ Classes defined in multiple tiers:");
+    for (const { className, tiers } of duplicateTiers) {
+      console.log(`   - ${className}: [${tiers.join(", ")}]`);
+    }
+  }
+  
+  // Bonus: Check for classes in srpLimits that don't exist in catalog
+  const extraInLimits: string[] = [];
+  for (const className of allDefinedClasses) {
+    if (!catalogGroupNames.has(className)) {
+      extraInLimits.push(className);
+    }
+  }
+  
+  if (extraInLimits.length > 0) {
+    console.log("\n⚠️  Classes in srpLimits.json but NOT in ship catalog (may be outdated):");
+    for (const name of extraInLimits.sort()) {
+      console.log(`   - ${name}`);
+    }
+  }
+  
+  if (!hasErrors) {
+    console.log("\n✅ All validations passed!");
+    console.log(`   - ${catalogGroupNames.size} ship classes found`);
+    console.log(`   - All classes are defined in srpLimits.json`);
+    console.log(`   - No duplicate tier assignments`);
+  }
+}
+
 async function buildShipCatalog() {
   console.log("Building ship catalog from EVE SDE...\n");
   
@@ -285,6 +381,9 @@ async function buildShipCatalog() {
   const outputPath = path.join(OUTPUT_DIR, "shipCatalog.json");
   fs.writeFileSync(outputPath, JSON.stringify(catalog, null, 2));
   console.log(`\nShip catalog saved to: ${outputPath}`);
+  
+  // Validate srpLimits.json
+  validateSrpLimits(groupIndex);
   
   console.log("\nCleaning up temporary files...");
   fs.rmSync(TEMP_DIR, { recursive: true, force: true });
