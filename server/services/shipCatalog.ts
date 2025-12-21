@@ -30,7 +30,7 @@ class ShipCatalogService {
   private allShips: ShipData[] = [];
   
   async initialize(): Promise<void> {
-    const catalogPath = path.join(process.cwd(), "server/data/sde/shipCatalog.json");
+    const catalogPath = path.join(process.cwd(), "server/staticData/sde/shipCatalog.json");
     
     if (!fs.existsSync(catalogPath)) {
       console.warn("Ship catalog not found. Run 'npx tsx scripts/build-ship-catalog.ts' to generate it.");

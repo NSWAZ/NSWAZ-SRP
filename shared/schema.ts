@@ -93,6 +93,7 @@ export const srpCalculateSchema = z.object({
   iskValue: z.number(),
   operationType: z.enum(["solo", "fleet"]),
   isSpecialRole: z.boolean().default(false),
+  groupName: z.string().optional(),
 });
 
 // Ship data type (from EVE SDE catalog)
@@ -125,6 +126,7 @@ export type SrpCalculateResponse = {
     operationMultiplier: number;
     specialRoleBonus: number;
     finalAmount: number;
+    maxPayout: number;
   };
 };
 

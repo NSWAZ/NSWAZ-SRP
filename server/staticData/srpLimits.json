@@ -1,0 +1,46 @@
+{
+  "version": "2025-12-21",
+  "description": "Solo SRP payout limits by ship class tier",
+  "tiers": [
+    {
+      "name": "Frigate",
+      "maxPayout": 50000000,
+      "classes": ["Frigate", "Assault Frigate", "Covert Ops", "Electronic Attack Ship", "Interceptor", "Logistics Frigate"]
+    },
+    {
+      "name": "Destroyer",
+      "maxPayout": 100000000,
+      "classes": ["Destroyer", "Command Destroyer", "Interdictor", "Tactical Destroyer"]
+    },
+    {
+      "name": "Cruiser",
+      "maxPayout": 300000000,
+      "classes": ["Cruiser", "Combat Recon Ship", "Force Recon Ship", "Heavy Assault Cruiser", "Heavy Interdictor", "Logistics", "Strategic Cruiser"]
+    },
+    {
+      "name": "Battlecruiser",
+      "maxPayout": 500000000,
+      "classes": ["Battlecruiser", "Command Ship", "Attack Battlecruiser"]
+    },
+    {
+      "name": "Battleship",
+      "maxPayout": 1000000000,
+      "classes": ["Battleship", "Black Ops", "Marauder"]
+    },
+    {
+      "name": "Capital",
+      "maxPayout": 3000000000,
+      "classes": ["Carrier", "Dreadnought", "Force Auxiliary", "Supercarrier", "Titan"]
+    },
+    {
+      "name": "Industrial",
+      "maxPayout": 200000000,
+      "classes": ["Industrial Ship", "Blockade Runner", "Deep Space Transport", "Mining Barge", "Exhumer", "Industrial Command Ship"]
+    },
+    {
+      "name": "Specialty",
+      "maxPayout": 100000000,
+      "classes": ["Shuttle", "Capsule", "Corvette", "Expedition Frigate"]
+    }
+  ]
+}

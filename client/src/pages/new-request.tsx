@@ -104,7 +104,7 @@ export default function NewRequest() {
   });
 
   const calculateMutation = useMutation({
-    mutationFn: async (data: { shipTypeId: number; iskValue: number; operationType: string; isSpecialRole: boolean }) => {
+    mutationFn: async (data: { shipTypeId: number; iskValue: number; operationType: string; isSpecialRole: boolean; groupName?: string }) => {
       const response = await apiRequest("POST", "/api/killmail/calculate", data);
       return response.json() as Promise<SrpCalculateResponse>;
     },
@@ -192,6 +192,7 @@ export default function NewRequest() {
         iskValue: parsedData.iskValue,
         operationType,
         isSpecialRole,
+        groupName: parsedData.groupName,
       });
     }
   }, [parsedData, operationType, isSpecialRole]);

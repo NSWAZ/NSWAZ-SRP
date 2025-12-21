@@ -5,13 +5,14 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./eveAuth";
 import { insertSrpRequestSchema, srpCalculateSchema, type SrpCalculateResponse } from "@shared/schema";
 import { z } from "zod";
 import { shipCatalogService } from "./services/shipCatalog";
+import { srpLimitsService } from "./services/srpLimits";
 
 // SRP Policy constants
 const SRP_POLICY = {
   FLEET_MULTIPLIER: 1.0,
   SOLO_MULTIPLIER: 0.5,
   SPECIAL_ROLE_BONUS: 0.2,
-  MAX_PAYOUT: 5000000000, // 5B ISK in full value
+  DEFAULT_MAX_PAYOUT: 5000000000, // 5B ISK default max
 };
 
 interface ZKillmailData {
@@ -219,7 +220,7 @@ export async function registerRoutes(
   app.post("/api/killmail/calculate", isAuthenticated, async (req: Request, res) => {
     try {
       const validated = srpCalculateSchema.parse(req.body);
-      const { iskValue, operationType, isSpecialRole } = validated;
+      const { iskValue, operationType, isSpecialRole, groupName } = validated;
 
       const baseValue = iskValue;
       const operationMultiplier = operationType === "fleet" 
@@ -227,8 +228,18 @@ export async function registerRoutes(
         : SRP_POLICY.SOLO_MULTIPLIER;
       const specialRoleBonus = isSpecialRole ? SRP_POLICY.SPECIAL_ROLE_BONUS : 0;
 
-      let finalAmount = baseValue * operationMultiplier * (1 + specialRoleBonus);
-      finalAmount = Math.min(finalAmount, SRP_POLICY.MAX_PAYOUT);
+      let calculatedAmount = baseValue * operationMultiplier * (1 + specialRoleBonus);
+
+      // Apply max payout limit based on operation type and ship class
+      let maxPayout: number;
+      if (operationType === "solo" && groupName) {
+        const soloLimit = srpLimitsService.getSoloMaxPayout(groupName);
+        maxPayout = soloLimit ?? SRP_POLICY.DEFAULT_MAX_PAYOUT;
+      } else {
+        maxPayout = SRP_POLICY.DEFAULT_MAX_PAYOUT;
+      }
+
+      const finalAmount = Math.min(calculatedAmount, maxPayout);
 
       const response: SrpCalculateResponse = {
         estimatedPayout: finalAmount,
@@ -237,6 +248,7 @@ export async function registerRoutes(
           operationMultiplier,
           specialRoleBonus,
           finalAmount,
+          maxPayout,
         },
       };
 
