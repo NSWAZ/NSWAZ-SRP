@@ -76,7 +76,7 @@ export const srpRequestFormSchema = z.object({
   isSpecialRole: z.number().default(0),
   fleetName: z.string().optional(),
   fcName: z.string().optional(),
-  lossDescription: z.string().min(10, "최소 10자 이상의 설명을 입력해주세요"),
+  lossDescription: z.string().optional(),
 }).refine(
   (data) => {
     if (data.operationType === "fleet") {

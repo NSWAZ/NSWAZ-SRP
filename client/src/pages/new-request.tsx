@@ -50,7 +50,7 @@ const formSchema = z.object({
   isSpecialRole: z.boolean().default(false),
   fleetName: z.string().optional(),
   fcName: z.string().optional(),
-  lossDescription: z.string().min(10, "최소 10자 이상의 설명을 입력해주세요"),
+  lossDescription: z.string().optional(),
 }).refine(
   (data) => {
     if (data.operationType === "fleet") {
@@ -445,17 +445,17 @@ export default function NewRequest() {
                 name="lossDescription"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>손실 설명</FormLabel>
+                    <FormLabel>추가 내용 (선택)</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="손실 상황을 설명해주세요..."
+                        placeholder="당시 상황에 대해 기술하고 싶은 내용이 있다면 자유롭게 적어주세요."
                         className="min-h-[100px] resize-none"
                         data-testid="textarea-description"
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      작전 중 함선이 어떻게 손실되었는지 간략히 설명해주세요
+                      (작성이 어려우신 경우 비워두셔도 좋습니다.)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
