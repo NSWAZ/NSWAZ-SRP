@@ -124,7 +124,7 @@ export type SrpCalculateResponse = {
   breakdown: {
     baseValue: number;
     operationMultiplier: number;
-    specialRoleBonus: number;
+    isSpecialRole: boolean;
     finalAmount: number;
     maxPayout: number;
     isSpecialShipClass?: boolean;

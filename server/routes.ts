@@ -9,9 +9,9 @@ import { srpLimitsService } from "./services/srpLimits";
 
 // SRP Policy constants
 const SRP_POLICY = {
-  FLEET_MULTIPLIER: 1.0,
-  SOLO_MULTIPLIER: 0.5,
-  SPECIAL_ROLE_BONUS: 0.2,
+  FLEET_MULTIPLIER: 0.5,       // 플릿: 50%
+  SOLO_MULTIPLIER: 0.25,       // 솔로잉: 25%
+  SPECIAL_ROLE_MULTIPLIER: 1.0, // 특수롤 (로지 등): 100%
   DEFAULT_MAX_PAYOUT: 5000000000, // 5B ISK default max
 };
 
@@ -227,19 +227,21 @@ export async function registerRoutes(
       // Check if special class (gets 100% even for solo)
       const isSpecialShipClass = groupName ? srpLimitsService.isSpecialClass(groupName) : false;
       
-      // Special class solo gets 100%, regular solo gets 50%
+      // Determine multiplier based on operation type and roles
       let operationMultiplier: number;
-      if (operationType === "fleet") {
-        operationMultiplier = SRP_POLICY.FLEET_MULTIPLIER;
-      } else if (isSpecialShipClass) {
-        operationMultiplier = SRP_POLICY.FLEET_MULTIPLIER; // 100% for special class solo
-      } else {
-        operationMultiplier = SRP_POLICY.SOLO_MULTIPLIER;
-      }
       
-      const specialRoleBonus = isSpecialRole ? SRP_POLICY.SPECIAL_ROLE_BONUS : 0;
+      if (isSpecialRole) {
+        // Special role (logi, etc.) always gets 100%
+        operationMultiplier = SRP_POLICY.SPECIAL_ROLE_MULTIPLIER;
+      } else if (operationType === "fleet") {
+        operationMultiplier = SRP_POLICY.FLEET_MULTIPLIER; // 50%
+      } else if (isSpecialShipClass) {
+        operationMultiplier = SRP_POLICY.SPECIAL_ROLE_MULTIPLIER; // Special class solo: 100%
+      } else {
+        operationMultiplier = SRP_POLICY.SOLO_MULTIPLIER; // Regular solo: 25%
+      }
 
-      let calculatedAmount = baseValue * operationMultiplier * (1 + specialRoleBonus);
+      let calculatedAmount = baseValue * operationMultiplier;
 
       // Apply max payout limit based on operation type and ship class
       let maxPayout: number;
@@ -257,7 +259,7 @@ export async function registerRoutes(
         breakdown: {
           baseValue,
           operationMultiplier,
-          specialRoleBonus,
+          isSpecialRole,
           finalAmount,
           maxPayout,
           isSpecialShipClass,

@@ -4,7 +4,7 @@
   "tiers": [
     {
       "name": "Frigate",
-      "maxPayout": 50000000,
+      "maxPayout": 30000000,
       "classes": [
         "Frigate",
         "Assault Frigate",
@@ -17,7 +17,7 @@
     },
     {
       "name": "Destroyer",
-      "maxPayout": 100000000,
+      "maxPayout": 60000000,
       "classes": [
         "Destroyer",
         "Command Destroyer",
@@ -27,7 +27,7 @@
     },
     {
       "name": "Cruiser",
-      "maxPayout": 300000000,
+      "maxPayout": 120000000,
       "classes": [
         "Cruiser",
         "Combat Recon Ship",
@@ -35,22 +35,27 @@
         "Heavy Assault Cruiser",
         "Heavy Interdictor",
         "Logistics",
-        "Strategic Cruiser"
+        "Strategic Cruiser",
+        "Industrial Ship",
+        "Blockade Runner",
+        "Deep Space Transport",
+        "Mining Barge",
+        "Exhumer"
       ]
     },
     {
       "name": "Battlecruiser",
-      "maxPayout": 500000000,
+      "maxPayout": 180000000,
       "classes": ["Battlecruiser", "Command Ship", "Attack Battlecruiser"]
     },
     {
       "name": "Battleship",
-      "maxPayout": 1000000000,
+      "maxPayout": 240000000,
       "classes": ["Battleship", "Black Ops", "Marauder"]
     },
     {
       "name": "Capital",
-      "maxPayout": 3000000000,
+      "maxPayout": 240000000,
       "classes": [
         "Carrier",
         "Dreadnought",
@@ -60,21 +65,9 @@
       ]
     },
     {
-      "name": "Industrial",
-      "maxPayout": 200000000,
-      "classes": [
-        "Industrial Ship",
-        "Blockade Runner",
-        "Deep Space Transport",
-        "Mining Barge",
-        "Exhumer",
-        "Industrial Command Ship"
-      ]
-    },
-    {
       "name": "Specialty",
       "maxPayout": 0,
-      "classes": ["Shuttle", "Capsule", "Corvette"]
+      "classes": ["Shuttle", "Capsule", "Corvette", "Industrial Command Ship"]
     }
   ]
 }
