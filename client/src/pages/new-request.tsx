@@ -87,6 +87,13 @@ export default function NewRequest() {
   const isSpecialRole = form.watch("isSpecialRole");
   const killmailUrl = form.watch("killmailUrl");
 
+  // Reset isSpecialRole when switching to solo
+  useEffect(() => {
+    if (operationType === "solo") {
+      form.setValue("isSpecialRole", false);
+    }
+  }, [operationType, form]);
+
   const parseMutation = useMutation({
     mutationFn: async (url: string) => {
       const response = await apiRequest("POST", "/api/killmail/parse", { url });
@@ -468,10 +475,10 @@ export default function NewRequest() {
                     <div className="text-sm text-muted-foreground mt-2 space-y-1">
                       <div>
                         {operationType === "fleet" 
-                          ? (isSpecialRole ? "플릿 + 특수롤 (100%)" : "플릿 (50%)")
+                          ? (calculatedPayout.breakdown.isSpecialRole ? "플릿 + 특수롤 (100%)" : "플릿 (50%)")
                           : calculatedPayout.breakdown.isSpecialShipClass 
                             ? "솔로잉 + 지원함급 보너스 (100%)" 
-                            : (isSpecialRole ? "솔로잉 + 특수롤 (100%)" : "솔로잉 (25%)")
+                            : "솔로잉 (25%)"
                         }
                       </div>
                       {(() => {

@@ -227,11 +227,14 @@ export async function registerRoutes(
       // Check if special class (gets 100% even for solo)
       const isSpecialShipClass = groupName ? srpLimitsService.isSpecialClass(groupName) : false;
       
+      // Special role only applies to fleet operations
+      const effectiveSpecialRole = operationType === "fleet" && isSpecialRole;
+      
       // Determine multiplier based on operation type and roles
       let operationMultiplier: number;
       
-      if (isSpecialRole) {
-        // Special role (logi, etc.) always gets 100%
+      if (effectiveSpecialRole) {
+        // Special role (logi, etc.) in fleet gets 100%
         operationMultiplier = SRP_POLICY.SPECIAL_ROLE_MULTIPLIER;
       } else if (operationType === "fleet") {
         operationMultiplier = SRP_POLICY.FLEET_MULTIPLIER; // 50%
@@ -259,7 +262,7 @@ export async function registerRoutes(
         breakdown: {
           baseValue,
           operationMultiplier,
-          isSpecialRole,
+          isSpecialRole: effectiveSpecialRole,
           finalAmount,
           maxPayout,
           isSpecialShipClass,
