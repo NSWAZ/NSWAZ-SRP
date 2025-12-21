@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import backgroundImage from "@assets/Nag1_1766304787177.png";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
@@ -27,9 +28,9 @@ export default function Landing() {
   return (
     <div className="relative min-h-screen bg-black">
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-60"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-70"
         style={{
-          backgroundImage: `url('https://web.ccpgamescdn.com/aws/eveonline/images/backgrounds/eve-background-1.jpg')`,
+          backgroundImage: `url(${backgroundImage})`,
         }}
       />
       
@@ -67,17 +68,17 @@ export default function Landing() {
             </h1>
             
             <div className="space-y-4">
-              <Button 
-                size="lg" 
-                className="w-full max-w-xs bg-transparent border border-white/30 text-white hover:bg-white/10 hover:border-white/50"
-                asChild 
+              <a 
+                href="/api/login" 
+                className="inline-block transition-opacity hover:opacity-80"
                 data-testid="button-login"
               >
-                <a href="/api/login" className="flex items-center justify-center gap-3">
-                  <span className="text-sm font-bold tracking-widest text-green-400">EVE</span>
-                  <span className="text-sm">LOG IN with EVE Online</span>
-                </a>
-              </Button>
+                <img 
+                  src="https://web.ccpgamescdn.com/eveonlineassets/developers/eve-sso-login-black-large.png" 
+                  alt="Log in with EVE Online"
+                  className="h-auto"
+                />
+              </a>
 
               {isDevelopment && (
                 <Button 
