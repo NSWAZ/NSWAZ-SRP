@@ -252,9 +252,12 @@ export async function setupAuth(app: Express) {
     try {
       const role = (req.query.role as string) || "member";
       
+      // Use a real character ID for development testing
+      const testCharacterId = 96386549;
+      
       // Dummy character info (same structure as EVE SSO response)
       const testCharacterInfo: EveCharacterInfo = {
-        CharacterID: 12345678,
+        CharacterID: testCharacterId,
         CharacterName: `TestUser_${role}`,
         ExpiresOn: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         Scopes: "",
@@ -281,6 +284,11 @@ export async function setupAuth(app: Express) {
       req.session.accessToken = testTokens.access_token;
       req.session.refreshToken = testTokens.refresh_token;
       req.session.tokenExpiry = Date.now() + testTokens.expires_in * 1000;
+
+      // Sync user's characters from SeAT API (async, don't block login)
+      seatApiService.syncUserCharacters(userId, testCharacterId).catch(err => {
+        console.error("Failed to sync characters from SeAT:", err);
+      });
 
       // Redirect to homepage like real SSO
       res.redirect("/");
