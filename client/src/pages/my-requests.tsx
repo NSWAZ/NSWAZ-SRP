@@ -43,6 +43,19 @@ function formatDate(date: string | Date | null): string {
   });
 }
 
+function formatIsk(amount: number): string {
+  if (amount >= 1000000000) {
+    return `${(amount / 1000000000).toFixed(2)}B`;
+  } else if (amount >= 1000000) {
+    return `${(amount / 1000000).toFixed(1)}M`;
+  }
+  return `${amount.toLocaleString()}`;
+}
+
+function getOperationTypeLabel(type: string): string {
+  return type === "fleet" ? "플릿" : "솔로";
+}
+
 export default function MyRequests() {
   const { data: requests, isLoading } = useQuery<SrpRequestWithDetails[]>({
     queryKey: ["/api/srp-requests/my"],
@@ -85,7 +98,8 @@ export default function MyRequests() {
                   <TableRow>
                     <TableHead>날짜</TableHead>
                     <TableHead>함선</TableHead>
-                    <TableHead>함대</TableHead>
+                    <TableHead>캐릭터</TableHead>
+                    <TableHead>유형</TableHead>
                     <TableHead className="text-right">금액</TableHead>
                     <TableHead className="text-right">지급액</TableHead>
                     <TableHead>상태</TableHead>
@@ -98,17 +112,31 @@ export default function MyRequests() {
                       <TableCell className="font-mono text-sm">
                         {formatDate(request.createdAt)}
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {request.shipData?.typeName || request.shipTypeName || "알 수 없음"}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={`https://images.evetech.net/types/${request.shipTypeId}/icon?size=32`}
+                            alt=""
+                            className="h-6 w-6"
+                          />
+                          <span className="font-medium">
+                            {request.shipData?.typeName || request.shipTypeName || "알 수 없음"}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {request.fleet?.operationName || request.fleetName || "-"}
+                        {request.victimCharacterName || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={request.operationType === "fleet" ? "secondary" : "outline"} className="text-xs">
+                          {getOperationTypeLabel(request.operationType)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {request.iskAmount}M
+                        {formatIsk(request.iskAmount)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {request.payoutAmount ? `${request.payoutAmount}M` : "-"}
+                        {request.payoutAmount ? formatIsk(request.payoutAmount) : "-"}
                       </TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(request.status)}>

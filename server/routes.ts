@@ -558,6 +558,16 @@ export async function registerRoutes(
         console.warn(`User seatUserId=${user.seatUserId} using mainCharacter fallback for SRP validation`);
       }
       
+      // Check for duplicate killmail
+      if (validated.killmailId) {
+        const existingRequest = await storage.getSrpRequestByKillmailId(validated.killmailId);
+        if (existingRequest) {
+          return res.status(400).json({ 
+            message: "이미 신청된 킬메일입니다. 동일한 킬메일로 중복 신청할 수 없습니다." 
+          });
+        }
+      }
+
       if (validated.operationType === "fleet") {
         if (!validated.fleetId) {
           return res.status(400).json({ 

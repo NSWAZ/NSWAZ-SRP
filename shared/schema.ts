@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, pgEnum, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, pgEnum, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -45,6 +45,7 @@ export const fleets = pgTable("fleets", {
 export const srpRequests = pgTable("srp_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   seatUserId: integer("seat_user_id").notNull(),
+  killmailId: integer("killmail_id").notNull(),
   victimCharacterId: integer("victim_character_id"),
   victimCharacterName: text("victim_character_name"),
   shipTypeId: integer("ship_type_id").notNull(),
@@ -70,6 +71,7 @@ export const srpRequests = pgTable("srp_requests", {
   index("idx_srp_requests_status").on(table.status),
   index("idx_srp_requests_created_at").on(table.createdAt),
   index("idx_srp_requests_victim_character").on(table.victimCharacterId),
+  uniqueIndex("idx_srp_requests_killmail_id_unique").on(table.killmailId),
 ]);
 
 export const userRolesRelations = relations(userRoles, ({ }) => ({}));

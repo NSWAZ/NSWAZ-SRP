@@ -31,6 +31,7 @@ export interface IStorage {
   // SRP Requests
   getSrpRequests(seatUserId?: number, status?: string): Promise<SrpRequestWithDetails[]>;
   getSrpRequest(id: string): Promise<SrpRequestWithDetails | undefined>;
+  getSrpRequestByKillmailId(killmailId: number): Promise<SrpRequest | undefined>;
   createSrpRequest(seatUserId: number, data: InsertSrpRequest): Promise<SrpRequest>;
   updateSrpRequest(id: string, data: Partial<SrpRequest>): Promise<SrpRequest | undefined>;
   reviewSrpRequest(id: string, reviewerSeatUserId: number, status: string, note?: string, payout?: number): Promise<SrpRequest | undefined>;
@@ -168,6 +169,14 @@ export class DatabaseStorage implements IStorage {
       pilotName,
       fleet,
     };
+  }
+
+  async getSrpRequestByKillmailId(killmailId: number): Promise<SrpRequest | undefined> {
+    const [request] = await db
+      .select()
+      .from(srpRequests)
+      .where(eq(srpRequests.killmailId, killmailId));
+    return request || undefined;
   }
 
   async createSrpRequest(seatUserId: number, data: InsertSrpRequest): Promise<SrpRequest> {

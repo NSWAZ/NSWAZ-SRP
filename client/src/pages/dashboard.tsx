@@ -16,10 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { DashboardStats, SrpRequestWithDetails } from "@shared/schema";
 
 function formatIsk(amount: number): string {
-  if (amount >= 1000) {
-    return `${(amount / 1000).toFixed(1)}B ISK`;
+  if (amount >= 1000000000) {
+    return `${(amount / 1000000000).toFixed(2)}B`;
+  } else if (amount >= 1000000) {
+    return `${(amount / 1000000).toFixed(1)}M`;
   }
-  return `${amount}M ISK`;
+  return `${amount.toLocaleString()}`;
 }
 
 function getStatusVariant(status: string) {
@@ -170,16 +172,27 @@ export default function Dashboard() {
                     className="flex items-center justify-between"
                     data-testid={`row-request-${request.id}`}
                   >
-                    <div>
-                      <p className="font-medium">{request.shipType?.name || "Unknown Ship"}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {request.createdAt && formatTimeAgo(request.createdAt)}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src={`https://images.evetech.net/types/${request.shipTypeId}/icon?size=32`}
+                        alt=""
+                        className="h-6 w-6"
+                      />
+                      <div>
+                        <p className="font-medium">
+                          {request.shipData?.typeName || request.shipTypeName || "알 수 없는 함선"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {request.createdAt && formatTimeAgo(request.createdAt)}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm">{request.iskAmount}M</span>
+                      <span className="font-mono text-sm">{formatIsk(request.iskAmount)}</span>
                       <Badge variant={getStatusVariant(request.status)}>
-                        {request.status}
+                        {request.status === "approved" ? "승인됨" : 
+                         request.status === "denied" ? "거부됨" : 
+                         request.status === "processing" ? "처리 중" : "대기 중"}
                       </Badge>
                     </div>
                   </div>
