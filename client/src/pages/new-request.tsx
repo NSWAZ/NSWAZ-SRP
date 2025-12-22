@@ -359,7 +359,17 @@ export default function NewRequest() {
                   <div className="text-sm">
                     <div className="font-medium">본인 캐릭터가 아닙니다</div>
                     <div className="text-muted-foreground">
-                      이 킬메일은 본인 소유의 캐릭터 로스가 아닙니다. 캐릭터 동기화가 필요하거나, 본인의 로스만 SRP 신청이 가능합니다.
+                      본인 캐릭터의 로스만 SRP 신청하실 수 있습니다. 본인 캐릭터가 맞으시다면{" "}
+                      <a 
+                        href="https://forums.nisuwaz.com/t/seat/224" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary underline inline-flex items-center gap-1"
+                      >
+                        SeAT 알트 추가 가이드
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      를 참고하여 시트에 알트를 추가하신 후, 이 사이트 로그아웃 → 로그인을 해 주세요.
                     </div>
                   </div>
                 </div>
