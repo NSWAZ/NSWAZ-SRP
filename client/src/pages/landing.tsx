@@ -1,18 +1,40 @@
-import { FlaskConical } from "lucide-react";
+import { useState } from "react";
+import { FlaskConical, User, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import backgroundImage from "@assets/Nag1_1766304787177.png";
 
+interface TestCharacter {
+  characterId: number;
+  name: string;
+  role: "member" | "fc";
+  roleLabel: string;
+}
+
+const testCharacters: TestCharacter[] = [
+  { characterId: 96386549, name: "Test Member", role: "member", roleLabel: "멤버" },
+  { characterId: 94403590, name: "Test FC", role: "fc", roleLabel: "FC" },
+];
+
 export default function Landing() {
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
+
   const { data: devModeData } = useQuery<{ isDevelopment: boolean }>({
     queryKey: ["/api/dev-mode"],
   });
 
   const isDevelopment = devModeData?.isDevelopment ?? false;
   
-  const handleTestLogin = () => {
-    // Redirect to test login endpoint (same flow as SSO, but with dummy values)
-    window.location.href = "/api/test-login?role=member";
+  const handleTestLogin = (characterId: number) => {
+    window.location.href = `/api/test-login?characterId=${characterId}`;
   };
 
   return (
@@ -64,7 +86,7 @@ export default function Landing() {
                   size="lg"
                   variant="ghost"
                   className="w-full max-w-xs text-white/60 hover:text-white hover:bg-white/10"
-                  onClick={handleTestLogin}
+                  onClick={() => setShowCharacterModal(true)}
                   data-testid="button-test-login"
                 >
                   <FlaskConical className="mr-2 h-4 w-4" />
@@ -81,6 +103,45 @@ export default function Landing() {
           </p>
         </footer>
       </div>
+
+      <Dialog open={showCharacterModal} onOpenChange={setShowCharacterModal}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-test-login">
+          <DialogHeader>
+            <DialogTitle>테스트 캐릭터 선택</DialogTitle>
+            <DialogDescription>
+              로그인할 테스트 캐릭터를 선택하세요
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            {testCharacters.map((char) => (
+              <Button
+                key={char.characterId}
+                variant="outline"
+                className="flex items-center justify-between gap-4 h-auto py-3"
+                onClick={() => handleTestLogin(char.characterId)}
+                data-testid={`button-login-${char.role}`}
+              >
+                <div className="flex items-center gap-3">
+                  <img
+                    src={`https://images.evetech.net/characters/${char.characterId}/portrait?size=64`}
+                    alt={char.name}
+                    className="h-10 w-10 rounded-full"
+                  />
+                  <span className="font-medium">{char.name}</span>
+                </div>
+                <Badge variant={char.role === "fc" ? "default" : "secondary"}>
+                  {char.role === "fc" ? (
+                    <Shield className="mr-1 h-3 w-3" />
+                  ) : (
+                    <User className="mr-1 h-3 w-3" />
+                  )}
+                  {char.roleLabel}
+                </Badge>
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

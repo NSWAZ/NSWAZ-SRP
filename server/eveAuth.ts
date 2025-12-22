@@ -6,6 +6,7 @@ import { db } from "./db";
 import { users } from "@shared/models/auth";
 import { eq } from "drizzle-orm";
 import { seatApiService } from "./services/seatApi";
+import { storage } from "./storage";
 
 const EVE_SSO_AUTH_URL = "https://login.eveonline.com/v2/oauth/authorize";
 const EVE_SSO_TOKEN_URL = "https://login.eveonline.com/v2/oauth/token";
@@ -256,10 +257,22 @@ export async function setupAuth(app: Express) {
     }
 
     try {
-      const role = (req.query.role as string) || "member";
+      // Supported test characters with their roles
+      const testCharacters: Record<number, string> = {
+        96386549: "member",  // Existing test character
+        94403590: "fc",      // FC test character
+      };
+
+      // Accept characterId from query parameter
+      const characterIdParam = req.query.characterId as string;
+      const testCharacterId = characterIdParam ? parseInt(characterIdParam, 10) : 96386549;
       
-      // Use a real character ID for development testing
-      const testCharacterId = 96386549;
+      // Validate character ID
+      if (!testCharacters[testCharacterId]) {
+        return res.redirect("/?error=invalid_test_character");
+      }
+      
+      const role = testCharacters[testCharacterId];
       
       // Try to get character name from SeAT API
       let characterName = `TestUser_${role}`;
@@ -289,6 +302,16 @@ export async function setupAuth(app: Express) {
 
       // Use the same upsertUser function as real SSO
       const userId = await upsertUser(testCharacterInfo, testTokens);
+
+      // Ensure role is set for test character
+      const existingRole = await storage.getUserRole(userId);
+      if (!existingRole) {
+        await storage.createUserRole({ userId, role: role as "member" | "fc" | "admin" });
+        console.log(`Created ${role} role for test user ${userId}`);
+      } else if (existingRole.role !== role) {
+        await storage.updateUserRole(userId, role);
+        console.log(`Updated role to ${role} for test user ${userId}`);
+      }
 
       // Set session exactly like real SSO callback
       req.session.userId = userId;
