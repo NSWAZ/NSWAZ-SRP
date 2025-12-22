@@ -11,13 +11,13 @@ export const userRoleEnum = pgEnum("user_role", ["member", "fc", "admin"]);
 export const srpStatusEnum = pgEnum("srp_status", ["pending", "approved", "denied", "processing"]);
 export const operationTypeEnum = pgEnum("operation_type", ["solo", "fleet"]);
 
-// User roles table (3NF - separate entity for role assignments)
+// User roles table - maps SeAT user ID to role
 export const userRoles = pgTable("user_roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
+  seatUserId: integer("seat_user_id").notNull().unique(),
   role: userRoleEnum("role").notNull().default("member"),
 }, (table) => [
-  index("idx_user_roles_user_id").on(table.userId),
+  index("idx_user_roles_seat_user_id").on(table.seatUserId),
 ]);
 
 // Fleet status enum
@@ -30,13 +30,13 @@ export const fleets = pgTable("fleets", {
   description: text("description"),
   scheduledAt: timestamp("scheduled_at").notNull(),
   location: text("location"),
-  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdBySeatUserId: integer("created_by_seat_user_id").notNull(),
   fcCharacterName: text("fc_character_name").notNull(),
   status: fleetStatusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
-  index("idx_fleets_created_by").on(table.createdByUserId),
+  index("idx_fleets_created_by").on(table.createdBySeatUserId),
   index("idx_fleets_scheduled_at").on(table.scheduledAt),
   index("idx_fleets_status").on(table.status),
 ]);
@@ -44,8 +44,8 @@ export const fleets = pgTable("fleets", {
 // SRP Requests table
 export const srpRequests = pgTable("srp_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
-  victimCharacterId: integer("victim_character_id"), // EVE character ID who lost the ship
+  seatUserId: integer("seat_user_id").notNull(),
+  victimCharacterId: integer("victim_character_id"),
   victimCharacterName: text("victim_character_name"),
   shipTypeId: integer("ship_type_id").notNull(),
   shipTypeName: text("ship_type_name"),
@@ -54,11 +54,11 @@ export const srpRequests = pgTable("srp_requests", {
   operationType: operationTypeEnum("operation_type").notNull().default("fleet"),
   isSpecialRole: integer("is_special_role").notNull().default(0),
   lossDescription: text("loss_description"),
-  fleetId: varchar("fleet_id"), // References fleets.id (UUID)
-  fleetName: text("fleet_name"), // Legacy field, kept for backward compatibility
-  fcName: text("fc_name"), // Legacy field, kept for backward compatibility
+  fleetId: varchar("fleet_id"),
+  fleetName: text("fleet_name"),
+  fcName: text("fc_name"),
   status: srpStatusEnum("status").notNull().default("pending"),
-  reviewerId: varchar("reviewer_id"),
+  reviewerSeatUserId: integer("reviewer_seat_user_id"),
   reviewerNote: text("reviewer_note"),
   payoutAmount: integer("payout_amount"),
   estimatedPayout: integer("estimated_payout"),
@@ -66,7 +66,7 @@ export const srpRequests = pgTable("srp_requests", {
   updatedAt: timestamp("updated_at").defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
 }, (table) => [
-  index("idx_srp_requests_user_id").on(table.userId),
+  index("idx_srp_requests_seat_user_id").on(table.seatUserId),
   index("idx_srp_requests_status").on(table.status),
   index("idx_srp_requests_created_at").on(table.createdAt),
   index("idx_srp_requests_victim_character").on(table.victimCharacterId),
@@ -86,11 +86,11 @@ export const insertFleetSchema = createInsertSchema(fleets).omit({
 });
 export const insertSrpRequestSchema = createInsertSchema(srpRequests).omit({ 
   id: true, 
-  userId: true, // Set from session, not from request body
+  seatUserId: true,
   createdAt: true, 
   updatedAt: true,
   reviewedAt: true,
-  reviewerId: true,
+  reviewerSeatUserId: true,
   reviewerNote: true,
   payoutAmount: true,
   estimatedPayout: true,
@@ -116,9 +116,9 @@ export const srpRequestFormSchema = z.object({
   iskAmount: z.number().min(1, "ISK 금액은 최소 1백만 이상이어야 합니다"),
   operationType: z.enum(["solo", "fleet"]),
   isSpecialRole: z.number().default(0),
-  fleetId: z.string().optional(), // UUID of fleet to link
-  fleetName: z.string().optional(), // Legacy, auto-filled from fleet
-  fcName: z.string().optional(), // Legacy, auto-filled from fleet
+  fleetId: z.string().optional(),
+  fleetName: z.string().optional(),
+  fcName: z.string().optional(),
   lossDescription: z.string().optional(),
 }).refine(
   (data) => {
@@ -182,7 +182,7 @@ export type SrpRequestWithDetails = SrpRequest & {
   shipData?: ShipData;
   pilotName?: string;
   reviewerName?: string;
-  fleet?: Fleet; // Linked fleet info
+  fleet?: Fleet;
 };
 
 export type DashboardStats = {

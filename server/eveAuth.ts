@@ -2,16 +2,12 @@ import session from "express-session";
 import type { Express, RequestHandler, Request, Response } from "express";
 import connectPg from "connect-pg-simple";
 import crypto from "crypto";
-import { db } from "./db";
-import { users } from "@shared/models/auth";
-import { eq } from "drizzle-orm";
 import { seatApiService } from "./services/seatApi";
 import { storage } from "./storage";
+import type { SessionUserData } from "@shared/models/auth";
 
 const EVE_SSO_AUTH_URL = "https://login.eveonline.com/v2/oauth/authorize";
 const EVE_SSO_TOKEN_URL = "https://login.eveonline.com/v2/oauth/token";
-const EVE_SSO_REVOKE_URL = "https://login.eveonline.com/v2/oauth/revoke";
-const EVE_VERIFY_URL = "https://esi.evetech.net/verify/";
 
 interface EveTokenResponse {
   access_token: string;
@@ -32,14 +28,11 @@ interface EveCharacterInfo {
 
 declare module "express-session" {
   interface SessionData {
-    userId?: string;
-    characterId?: number;
-    characterName?: string;
+    user?: SessionUserData;
     accessToken?: string;
     refreshToken?: string;
     tokenExpiry?: number;
     oauthState?: string;
-    associatedCharacterIds?: number[];
   }
 }
 
@@ -120,7 +113,7 @@ async function refreshAccessToken(refreshToken: string): Promise<EveTokenRespons
 }
 
 async function getCharacterInfo(accessToken: string): Promise<EveCharacterInfo> {
-  const response = await fetch(EVE_VERIFY_URL, {
+  const response = await fetch("https://esi.evetech.net/verify/", {
     headers: {
       "Authorization": `Bearer ${accessToken}`,
     },
@@ -133,36 +126,37 @@ async function getCharacterInfo(accessToken: string): Promise<EveCharacterInfo> 
   return response.json();
 }
 
-async function upsertUser(characterInfo: EveCharacterInfo, tokens: EveTokenResponse): Promise<string> {
-  const tokenExpiry = new Date(Date.now() + tokens.expires_in * 1000);
-  const profileImageUrl = `https://images.evetech.net/characters/${characterInfo.CharacterID}/portrait?size=128`;
-  
-  const existingUser = await db.select().from(users).where(eq(users.characterId, characterInfo.CharacterID)).limit(1);
-  
-  if (existingUser.length > 0) {
-    await db.update(users)
-      .set({
-        characterName: characterInfo.CharacterName,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiry: tokenExpiry,
-        profileImageUrl: profileImageUrl,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.characterId, characterInfo.CharacterID));
-    return existingUser[0].id;
-  } else {
-    const [newUser] = await db.insert(users)
-      .values({
-        characterId: characterInfo.CharacterID,
-        characterName: characterInfo.CharacterName,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiry: tokenExpiry,
-        profileImageUrl: profileImageUrl,
-      })
-      .returning();
-    return newUser.id;
+async function fetchUserDataFromSeat(characterId: number): Promise<SessionUserData | null> {
+  try {
+    // Get SeAT user ID from character
+    const seatUserId = await seatApiService.getSeatUserIdForCharacter(characterId);
+    if (!seatUserId) {
+      console.error(`Could not find SeAT user for character ${characterId}`);
+      return null;
+    }
+
+    // Get associated character IDs
+    const associatedCharacterIds = await seatApiService.getAssociatedCharacterIds(characterId);
+    
+    // Get character sheet for additional info
+    const characterSheet = await seatApiService.getCharacterSheet(characterId);
+    
+    const profileImageUrl = `https://images.evetech.net/characters/${characterId}/portrait?size=128`;
+
+    return {
+      seatUserId,
+      mainCharacterId: characterId,
+      mainCharacterName: characterSheet?.name || `Character_${characterId}`,
+      profileImageUrl,
+      corporationId: characterSheet?.corporation_id,
+      corporationName: undefined,
+      allianceId: characterSheet?.alliance_id,
+      allianceName: undefined,
+      associatedCharacterIds,
+    };
+  } catch (error) {
+    console.error("Error fetching user data from SeAT:", error);
+    return null;
   }
 }
 
@@ -211,24 +205,20 @@ export async function setupAuth(app: Express) {
       const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/callback`;
       const tokens = await exchangeCodeForToken(code, redirectUri);
       const characterInfo = await getCharacterInfo(tokens.access_token);
-      const userId = await upsertUser(characterInfo, tokens);
 
-      req.session.userId = userId;
-      req.session.characterId = characterInfo.CharacterID;
-      req.session.characterName = characterInfo.CharacterName;
+      // Fetch user data from SeAT and store in session
+      const userData = await fetchUserDataFromSeat(characterInfo.CharacterID);
+      
+      if (!userData) {
+        return res.redirect("/?error=seat_user_not_found");
+      }
+
+      req.session.user = userData;
       req.session.accessToken = tokens.access_token;
       req.session.refreshToken = tokens.refresh_token;
       req.session.tokenExpiry = Date.now() + tokens.expires_in * 1000;
 
-      // Fetch associated character IDs from SeAT and store in session
-      const associatedCharacterIds = await seatApiService.getAssociatedCharacterIds(characterInfo.CharacterID);
-      req.session.associatedCharacterIds = associatedCharacterIds;
-      console.log(`Stored ${associatedCharacterIds.length} associated character IDs in session for user ${userId}`);
-
-      // Also sync user's characters to DB for backup/reference (async, don't block login)
-      seatApiService.syncUserCharacters(userId, characterInfo.CharacterID).catch(err => {
-        console.error("Failed to sync characters from SeAT:", err);
-      });
+      console.log(`User logged in: seatUserId=${userData.seatUserId}, characterName=${userData.mainCharacterName}`);
 
       res.redirect("/");
     } catch (error) {
@@ -248,7 +238,6 @@ export async function setupAuth(app: Express) {
   });
 
   // Test login route - ONLY available in development mode
-  // Follows the same flow as EVE SSO but with dummy values
   app.get("/api/test-login", async (req: Request, res: Response) => {
     const isDevelopment = process.env.NODE_ENV !== "production";
     
@@ -259,79 +248,43 @@ export async function setupAuth(app: Express) {
     try {
       // Supported test characters with their roles
       const testCharacters: Record<number, string> = {
-        96386549: "member",  // Existing test character
-        94403590: "fc",      // FC test character
+        96386549: "member",
+        94403590: "fc",
       };
 
-      // Accept characterId from query parameter
       const characterIdParam = req.query.characterId as string;
       const testCharacterId = characterIdParam ? parseInt(characterIdParam, 10) : 96386549;
       
-      // Validate character ID
       if (!testCharacters[testCharacterId]) {
         return res.redirect("/?error=invalid_test_character");
       }
       
       const role = testCharacters[testCharacterId];
       
-      // Try to get character name from SeAT API
-      let characterName = `TestUser_${role}`;
-      const characterSheet = await seatApiService.getCharacterSheet(testCharacterId);
-      if (characterSheet && characterSheet.name) {
-        characterName = characterSheet.name;
-      }
+      // Fetch user data from SeAT
+      const userData = await fetchUserDataFromSeat(testCharacterId);
       
-      // Dummy character info (same structure as EVE SSO response)
-      const testCharacterInfo: EveCharacterInfo = {
-        CharacterID: testCharacterId,
-        CharacterName: characterName,
-        ExpiresOn: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        Scopes: "",
-        TokenType: "Character",
-        CharacterOwnerHash: "test_hash_" + role,
-        IntellectualProperty: "EVE",
-      };
-
-      // Dummy tokens (same structure as EVE SSO token response)
-      const testTokens: EveTokenResponse = {
-        access_token: `test_access_token_${Date.now()}`,
-        token_type: "Bearer",
-        expires_in: 1200, // 20 minutes like real EVE tokens
-        refresh_token: `test_refresh_token_${Date.now()}`,
-      };
-
-      // Use the same upsertUser function as real SSO
-      const userId = await upsertUser(testCharacterInfo, testTokens);
+      if (!userData) {
+        return res.redirect("/?error=seat_user_not_found");
+      }
 
       // Ensure role is set for test character
-      const existingRole = await storage.getUserRole(userId);
+      const existingRole = await storage.getUserRole(userData.seatUserId);
       if (!existingRole) {
-        await storage.createUserRole({ userId, role: role as "member" | "fc" | "admin" });
-        console.log(`Created ${role} role for test user ${userId}`);
+        await storage.createUserRole({ seatUserId: userData.seatUserId, role: role as "member" | "fc" | "admin" });
+        console.log(`Created ${role} role for seatUserId ${userData.seatUserId}`);
       } else if (existingRole.role !== role) {
-        await storage.updateUserRole(userId, role);
-        console.log(`Updated role to ${role} for test user ${userId}`);
+        await storage.updateUserRole(userData.seatUserId, role);
+        console.log(`Updated role to ${role} for seatUserId ${userData.seatUserId}`);
       }
 
-      // Set session exactly like real SSO callback
-      req.session.userId = userId;
-      req.session.characterId = testCharacterInfo.CharacterID;
-      req.session.characterName = testCharacterInfo.CharacterName;
-      req.session.accessToken = testTokens.access_token;
-      req.session.refreshToken = testTokens.refresh_token;
-      req.session.tokenExpiry = Date.now() + testTokens.expires_in * 1000;
+      req.session.user = userData;
+      req.session.accessToken = `test_access_token_${Date.now()}`;
+      req.session.refreshToken = `test_refresh_token_${Date.now()}`;
+      req.session.tokenExpiry = Date.now() + 1200 * 1000;
 
-      // Fetch associated character IDs from SeAT and store in session
-      const associatedCharacterIds = await seatApiService.getAssociatedCharacterIds(testCharacterId);
-      req.session.associatedCharacterIds = associatedCharacterIds;
-      console.log(`Stored ${associatedCharacterIds.length} associated character IDs in session for test user ${userId}`);
+      console.log(`Test login: seatUserId=${userData.seatUserId}, characterName=${userData.mainCharacterName}, role=${role}`);
 
-      // Also sync user's characters to DB for backup/reference (async, don't block login)
-      seatApiService.syncUserCharacters(userId, testCharacterId).catch(err => {
-        console.error("Failed to sync characters from SeAT:", err);
-      });
-
-      // Redirect to homepage like real SSO
       res.redirect("/");
     } catch (error) {
       console.error("Test login error:", error);
@@ -346,7 +299,7 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req: Request, res: Response, next) => {
-  if (!req.session.userId) {
+  if (!req.session.user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -362,21 +315,18 @@ export const isAuthenticated: RequestHandler = async (req: Request, res: Respons
     return res.status(401).json({ message: "Unauthorized" });
   }
 
+  // For test tokens, just extend expiry
+  if (refreshToken.startsWith("test_")) {
+    req.session.tokenExpiry = Date.now() + 1200 * 1000;
+    return next();
+  }
+
   try {
     const tokens = await refreshAccessToken(refreshToken);
     
     req.session.accessToken = tokens.access_token;
     req.session.refreshToken = tokens.refresh_token;
     req.session.tokenExpiry = Date.now() + tokens.expires_in * 1000;
-
-    await db.update(users)
-      .set({
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiry: new Date(req.session.tokenExpiry),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, req.session.userId));
 
     return next();
   } catch (error) {
@@ -388,17 +338,16 @@ export const isAuthenticated: RequestHandler = async (req: Request, res: Respons
 export function registerAuthRoutes(app: Express): void {
   app.get("/api/auth/user", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = req.session.userId;
-      const [user] = await db.select().from(users).where(eq(users.id, userId!)).limit(1);
+      const user = req.session.user;
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
       res.json({
-        id: user.id,
-        characterId: user.characterId,
-        characterName: user.characterName,
+        seatUserId: user.seatUserId,
+        characterId: user.mainCharacterId,
+        characterName: user.mainCharacterName,
         profileImageUrl: user.profileImageUrl,
       });
     } catch (error) {

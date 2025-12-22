@@ -1,7 +1,3 @@
-import { db } from "../db";
-import { userCharacters } from "@shared/models/auth";
-import { eq } from "drizzle-orm";
-
 const SEAT_API_BASE = "https://seat.nisuwaz.com";
 
 interface SeatCharacterSheet {
@@ -112,70 +108,6 @@ export class SeatApiService {
     }
 
     return userInfo.associated_character_ids;
-  }
-
-  async syncUserCharacters(userId: string, mainCharacterId: number): Promise<void> {
-    if (!this.apiToken) {
-      console.log("SeAT API token not configured - skipping character sync");
-      return;
-    }
-
-    try {
-      const characterSheet = await this.getCharacterSheet(mainCharacterId);
-      if (!characterSheet || !characterSheet.user_id) {
-        console.log(`Could not get SeAT user_id for character ${mainCharacterId}`);
-        return;
-      }
-
-      const seatUserId = characterSheet.user_id;
-      const characters = await this.getUserCharacters(seatUserId);
-      
-      if (!characters || characters.length === 0) {
-        console.log(`No characters found for SeAT user ${seatUserId}`);
-        return;
-      }
-
-      for (const char of characters) {
-        const existingChar = await db.select()
-          .from(userCharacters)
-          .where(eq(userCharacters.characterId, char.character_id))
-          .limit(1);
-
-        if (existingChar.length > 0) {
-          // Update character data AND userId (reassign to current user based on SeAT)
-          await db.update(userCharacters)
-            .set({
-              userId, // Always update userId to current user (SeAT is source of truth)
-              characterName: char.name,
-              corporationId: char.corporation_id,
-              corporationName: char.corporation?.name,
-              allianceId: char.alliance_id,
-              allianceName: char.alliance?.name,
-              profileImageUrl: `https://images.evetech.net/characters/${char.character_id}/portrait?size=64`,
-              isMainCharacter: char.character_id === mainCharacterId ? 1 : 0,
-              lastSyncedAt: new Date(),
-            })
-            .where(eq(userCharacters.characterId, char.character_id));
-        } else {
-          await db.insert(userCharacters).values({
-            userId,
-            characterId: char.character_id,
-            characterName: char.name,
-            corporationId: char.corporation_id,
-            corporationName: char.corporation?.name,
-            allianceId: char.alliance_id,
-            allianceName: char.alliance?.name,
-            profileImageUrl: `https://images.evetech.net/characters/${char.character_id}/portrait?size=64`,
-            isMainCharacter: char.character_id === mainCharacterId ? 1 : 0,
-            lastSyncedAt: new Date(),
-          });
-        }
-      }
-
-      console.log(`Synced ${characters.length} characters for user ${userId}`);
-    } catch (error) {
-      console.error("Error syncing user characters:", error);
-    }
   }
 
   async getSeatUserIdForCharacter(characterId: number): Promise<number | null> {

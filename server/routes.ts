@@ -2,21 +2,17 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./eveAuth";
-import { insertSrpRequestSchema, srpCalculateSchema, fleetFormSchema, type SrpCalculateResponse, userCharacters } from "@shared/schema";
+import { insertSrpRequestSchema, srpCalculateSchema, fleetFormSchema, type SrpCalculateResponse } from "@shared/schema";
 import { z } from "zod";
 import { shipCatalogService } from "./services/shipCatalog";
 import { srpLimitsService } from "./services/srpLimits";
-import { seatApiService } from "./services/seatApi";
-import { db } from "./db";
-import { eq } from "drizzle-orm";
-import { users } from "@shared/models/auth";
 
 // SRP Policy constants
 const SRP_POLICY = {
-  FLEET_MULTIPLIER: 0.5,       // 플릿: 50%
-  SOLO_MULTIPLIER: 0.25,       // 솔로잉: 25%
-  SPECIAL_ROLE_MULTIPLIER: 1.0, // 특수롤 (로지 등): 100%
-  DEFAULT_MAX_PAYOUT: 5000000000, // 5B ISK default max
+  FLEET_MULTIPLIER: 0.5,
+  SOLO_MULTIPLIER: 0.25,
+  SPECIAL_ROLE_MULTIPLIER: 1.0,
+  DEFAULT_MAX_PAYOUT: 5000000000,
 };
 
 interface ZKillmailData {
@@ -44,23 +40,21 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup authentication first
   await setupAuth(app);
   registerAuthRoutes(app);
 
   // Get current user's role
   app.get("/api/user/role", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
+      const user = req.session.user;
+      if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      let userRole = await storage.getUserRole(userId);
+      let userRole = await storage.getUserRole(user.seatUserId);
       
-      // If no role exists, create a member role
       if (!userRole) {
-        userRole = await storage.createUserRole({ userId, role: "member" });
+        userRole = await storage.createUserRole({ seatUserId: user.seatUserId, role: "member" });
       }
 
       res.json({ role: userRole.role });
@@ -70,69 +64,24 @@ export async function registerRoutes(
     }
   });
 
-  // Get user's characters
+  // Get user's characters (from session)
   app.get("/api/user/characters", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       
-      const characters = await db.select()
-        .from(userCharacters)
-        .where(eq(userCharacters.userId, userId));
+      // Return characters from session data
+      const characters = user.associatedCharacterIds.map(id => ({
+        characterId: id,
+        isMainCharacter: id === user.mainCharacterId,
+      }));
       
       res.json(characters);
     } catch (error) {
       console.error("Error getting user characters:", error);
       res.status(500).json({ message: "Failed to get user characters" });
-    }
-  });
-
-  // Sync user's characters from SeAT API
-  app.post("/api/user/characters/sync", isAuthenticated, async (req: Request, res) => {
-    try {
-      const userId = req.session.userId!;
-      const characterId = req.session.characterId!;
-      
-      await seatApiService.syncUserCharacters(userId, characterId);
-      
-      const characters = await db.select()
-        .from(userCharacters)
-        .where(eq(userCharacters.userId, userId));
-      
-      res.json({ 
-        message: "캐릭터 동기화 완료",
-        characters 
-      });
-    } catch (error) {
-      console.error("Error syncing user characters:", error);
-      res.status(500).json({ message: "캐릭터 동기화에 실패했습니다" });
-    }
-  });
-
-  // Check if character belongs to user
-  app.get("/api/user/characters/:characterId/verify", isAuthenticated, async (req: Request, res) => {
-    try {
-      const userId = req.session.userId!;
-      const characterId = parseInt(req.params.characterId, 10);
-      
-      if (isNaN(characterId)) {
-        return res.status(400).json({ message: "Invalid character ID" });
-      }
-      
-      // Check if character belongs to user
-      const [char] = await db.select()
-        .from(userCharacters)
-        .where(eq(userCharacters.characterId, characterId))
-        .limit(1);
-      
-      const isOwned = char && char.userId === userId;
-      
-      res.json({ 
-        isOwned,
-        characterName: char?.characterName
-      });
-    } catch (error) {
-      console.error("Error verifying character ownership:", error);
-      res.status(500).json({ message: "Failed to verify character ownership" });
     }
   });
 
@@ -257,12 +206,12 @@ export async function registerRoutes(
   // Get my fleets (for FC users)
   app.get("/api/fleets/my/list", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
+      const user = req.session.user;
+      if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const fleets = await storage.getFleets(userId);
+      const fleets = await storage.getFleets(user.seatUserId);
       res.json(fleets);
     } catch (error) {
       console.error("Error getting my fleets:", error);
@@ -273,13 +222,13 @@ export async function registerRoutes(
   // Create fleet (FC/Admin only)
   app.post("/api/fleets", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
+      const user = req.session.user;
+      if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
       // Check if user has FC or admin role
-      const userRole = await storage.getUserRole(userId);
+      const userRole = await storage.getUserRole(user.seatUserId);
       if (!userRole || !["fc", "admin"].includes(userRole.role)) {
         return res.status(403).json({ message: "플릿 생성은 FC 또는 관리자만 가능합니다" });
       }
@@ -297,15 +246,14 @@ export async function registerRoutes(
         });
       }
       
-      // Get FC character name from session
-      const fcName = req.session.characterName || "Unknown FC";
+      const fcName = user.mainCharacterName;
       
-      const fleet = await storage.createFleet(userId, fcName, {
+      const fleet = await storage.createFleet(user.seatUserId, fcName, {
         operationName: parsed.data.operationName,
         description: parsed.data.description,
         scheduledAt: parsed.data.scheduledAt,
         location: parsed.data.location,
-        createdByUserId: userId,
+        createdBySeatUserId: user.seatUserId,
         fcCharacterName: fcName,
       });
       
@@ -319,8 +267,8 @@ export async function registerRoutes(
   // Update fleet status (FC owner or Admin only)
   app.patch("/api/fleets/:id/status", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
+      const user = req.session.user;
+      if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
@@ -337,8 +285,8 @@ export async function registerRoutes(
       }
       
       // Check permission (owner or admin)
-      const userRole = await storage.getUserRole(userId);
-      if (fleet.createdByUserId !== userId && userRole?.role !== "admin") {
+      const userRole = await storage.getUserRole(user.seatUserId);
+      if (fleet.createdBySeatUserId !== user.seatUserId && userRole?.role !== "admin") {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
       
@@ -361,7 +309,6 @@ export async function registerRoutes(
         return res.status(400).json({ message: "URL이 필요합니다" });
       }
 
-      // Extract killmail ID from zkillboard URL
       const zkillMatch = url.match(/zkillboard\.com\/kill\/(\d+)/);
       if (!zkillMatch) {
         return res.status(400).json({ message: "올바른 zKillboard URL을 입력해주세요" });
@@ -369,7 +316,6 @@ export async function registerRoutes(
 
       const killmailId = zkillMatch[1];
 
-      // Fetch from zKillboard API
       const zkillResponse = await fetch(`https://zkillboard.com/api/killID/${killmailId}/`);
       if (!zkillResponse.ok) {
         return res.status(400).json({ message: "킬메일 정보를 가져올 수 없습니다" });
@@ -384,7 +330,6 @@ export async function registerRoutes(
       const hash = killmail.zkb.hash;
       const totalValue = killmail.zkb.totalValue;
 
-      // Fetch detailed killmail from ESI
       const esiResponse = await fetch(
         `https://esi.evetech.net/latest/killmails/${killmailId}/${hash}/`
       );
@@ -396,22 +341,19 @@ export async function registerRoutes(
       const shipTypeId = esiData.victim.ship_type_id;
       const victimCharacterId = esiData.victim.character_id;
 
-      // Check if victim character belongs to user using session data from SeAT
-      const associatedCharacterIds = req.session.associatedCharacterIds || [];
+      // Check ownership using session data
+      const user = req.session.user;
+      const associatedCharacterIds = user?.associatedCharacterIds || [];
       let isOwnedCharacter = false;
       let victimCharacterName: string | undefined;
 
       if (victimCharacterId) {
-        // Check ownership using session-stored associated character IDs from SeAT
-        // If session has no character data (SeAT was unavailable), assume owned for UI display
         if (associatedCharacterIds.length > 0) {
           isOwnedCharacter = associatedCharacterIds.includes(victimCharacterId);
         } else {
-          // Fallback: if no session data, show as owned (validation happens on submit)
           isOwnedCharacter = true;
         }
         
-        // Always fetch character name from ESI for display
         try {
           const charResponse = await fetch(`https://esi.evetech.net/latest/characters/${victimCharacterId}/`);
           if (charResponse.ok) {
@@ -419,11 +361,10 @@ export async function registerRoutes(
             victimCharacterName = charData.name;
           }
         } catch {
-          // Ignore ESI errors for character name lookup
+          // Ignore ESI errors
         }
       }
 
-      // Get ship info from our catalog
       const ship = shipCatalogService.getShipByTypeId(shipTypeId);
 
       res.json({
@@ -432,7 +373,7 @@ export async function registerRoutes(
         shipTypeName: ship?.typeName || `Unknown (${shipTypeId})`,
         shipTypeNameKo: ship?.typeNameKo,
         groupName: ship?.groupName,
-        iskValue: totalValue, // Full ISK value
+        iskValue: totalValue,
         killmailTime: esiData.killmail_time,
         victimCharacterId,
         victimCharacterName,
@@ -451,30 +392,23 @@ export async function registerRoutes(
       const { iskValue, operationType, isSpecialRole, groupName } = validated;
 
       const baseValue = iskValue;
-      
-      // Check if special class (gets 100% even for solo)
       const isSpecialShipClass = groupName ? srpLimitsService.isSpecialClass(groupName) : false;
-      
-      // Special role only applies to fleet operations
       const effectiveSpecialRole = operationType === "fleet" && isSpecialRole;
       
-      // Determine multiplier based on operation type and roles
       let operationMultiplier: number;
       
       if (effectiveSpecialRole) {
-        // Special role (logi, etc.) in fleet gets 100%
         operationMultiplier = SRP_POLICY.SPECIAL_ROLE_MULTIPLIER;
       } else if (operationType === "fleet") {
-        operationMultiplier = SRP_POLICY.FLEET_MULTIPLIER; // 50%
+        operationMultiplier = SRP_POLICY.FLEET_MULTIPLIER;
       } else if (isSpecialShipClass) {
-        operationMultiplier = SRP_POLICY.SPECIAL_ROLE_MULTIPLIER; // Special class solo: 100%
+        operationMultiplier = SRP_POLICY.SPECIAL_ROLE_MULTIPLIER;
       } else {
-        operationMultiplier = SRP_POLICY.SOLO_MULTIPLIER; // Regular solo: 25%
+        operationMultiplier = SRP_POLICY.SOLO_MULTIPLIER;
       }
 
       let calculatedAmount = baseValue * operationMultiplier;
 
-      // Apply max payout limit based on operation type and ship class
       let maxPayout: number;
       if (operationType === "solo" && groupName) {
         const soloLimit = srpLimitsService.getSoloMaxPayout(groupName);
@@ -510,8 +444,11 @@ export async function registerRoutes(
   // SRP Requests - user's own requests (recent for dashboard)
   app.get("/api/srp-requests/my/recent", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
-      const requests = await storage.getSrpRequests(userId);
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const requests = await storage.getSrpRequests(user.seatUserId);
       res.json(requests.slice(0, 5));
     } catch (error) {
       console.error("Error getting recent requests:", error);
@@ -522,8 +459,11 @@ export async function registerRoutes(
   // SRP Requests - user's own requests (all)
   app.get("/api/srp-requests/my", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
-      const requests = await storage.getSrpRequests(userId);
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const requests = await storage.getSrpRequests(user.seatUserId);
       res.json(requests);
     } catch (error) {
       console.error("Error getting requests:", error);
@@ -534,8 +474,11 @@ export async function registerRoutes(
   // SRP Requests - all requests (admin only)
   app.get("/api/srp-requests/all/:status?", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
-      const userRole = await storage.getUserRole(userId);
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const userRole = await storage.getUserRole(user.seatUserId);
       
       if (!userRole || !["admin", "fc"].includes(userRole.role)) {
         return res.status(403).json({ message: "Forbidden" });
@@ -553,7 +496,10 @@ export async function registerRoutes(
   // Get single request
   app.get("/api/srp-requests/:id", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const { id } = req.params;
       
       const request = await storage.getSrpRequest(id);
@@ -562,11 +508,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Request not found" });
       }
 
-      // Check if user owns the request or is admin
-      const userRole = await storage.getUserRole(userId);
+      const userRole = await storage.getUserRole(user.seatUserId);
       const isAdmin = userRole && ["admin", "fc"].includes(userRole.role);
       
-      if (request.userId !== userId && !isAdmin) {
+      if (request.seatUserId !== user.seatUserId && !isAdmin) {
         return res.status(403).json({ message: "Forbidden" });
       }
 
@@ -580,34 +525,39 @@ export async function registerRoutes(
   // Create SRP request
   app.post("/api/srp-requests", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       
       const validated = insertSrpRequestSchema.parse(req.body);
       
-      // Require victimCharacterId for ownership validation
       if (!validated.victimCharacterId) {
         return res.status(400).json({ 
           message: "킬메일에서 피해자 캐릭터 정보를 찾을 수 없습니다. 올바른 킬메일 URL을 사용해주세요." 
         });
       }
       
-      // Validate character ownership using session-stored associated character IDs from SeAT
-      const associatedCharacterIds = req.session.associatedCharacterIds || [];
+      const associatedCharacterIds = user.associatedCharacterIds || [];
       
-      // If session has character IDs, validate strictly
-      // If session is empty (SeAT unavailable during login), allow submission with warning log
+      // Validate ownership: either from SeAT character list or fallback to main login character
       if (associatedCharacterIds.length > 0) {
+        // Full validation using SeAT character list
         if (!associatedCharacterIds.includes(validated.victimCharacterId)) {
           return res.status(403).json({ 
-            message: "이 킬메일은 본인 소유의 캐릭터가 아닙니다. 캐릭터를 동기화하거나 본인의 로스만 SRP 신청 가능합니다." 
+            message: "이 킬메일은 본인 소유의 캐릭터가 아닙니다. 본인의 로스만 SRP 신청 가능합니다." 
           });
         }
       } else {
-        // Session has no character data - log warning but allow (fallback for SeAT downtime)
-        console.warn(`User ${userId} submitting SRP without session character validation - SeAT data may have been unavailable during login`);
+        // Fallback: only allow main login character if SeAT data unavailable
+        if (validated.victimCharacterId !== user.mainCharacterId) {
+          return res.status(403).json({ 
+            message: "캐릭터 정보를 확인할 수 없습니다. 로그인한 캐릭터의 로스만 신청 가능합니다. 다시 로그인해주세요." 
+          });
+        }
+        console.warn(`User seatUserId=${user.seatUserId} using mainCharacter fallback for SRP validation`);
       }
       
-      // Validate fleet UUID if operation type is fleet
       if (validated.operationType === "fleet") {
         if (!validated.fleetId) {
           return res.status(400).json({ 
@@ -622,12 +572,11 @@ export async function registerRoutes(
           });
         }
         
-        // Auto-fill fleet name and FC name from fleet data for backward compatibility
         validated.fleetName = fleet.operationName;
         validated.fcName = fleet.fcCharacterName;
       }
       
-      const request = await storage.createSrpRequest(userId, validated);
+      const request = await storage.createSrpRequest(user.seatUserId, validated);
       res.status(201).json(request);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -641,8 +590,11 @@ export async function registerRoutes(
   // Review SRP request (approve/deny) - admin only
   app.patch("/api/srp-requests/:id/review", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
-      const userRole = await storage.getUserRole(userId);
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const userRole = await storage.getUserRole(user.seatUserId);
       
       if (!userRole || !["admin", "fc"].includes(userRole.role)) {
         return res.status(403).json({ message: "Forbidden" });
@@ -655,7 +607,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const request = await storage.reviewSrpRequest(id, userId, status, reviewerNote, payoutAmount);
+      const request = await storage.reviewSrpRequest(id, user.seatUserId, status, reviewerNote, payoutAmount);
       
       if (!request) {
         return res.status(404).json({ message: "Request not found" });
@@ -671,21 +623,22 @@ export async function registerRoutes(
   // Make first user admin (bootstrap endpoint)
   app.post("/api/admin/bootstrap", isAuthenticated, async (req: Request, res) => {
     try {
-      const userId = req.session.userId!;
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       
-      // Check if any admin exists
-      const existingRole = await storage.getUserRole(userId);
+      const existingRole = await storage.getUserRole(user.seatUserId);
       
       if (existingRole?.role === "admin") {
         return res.json({ message: "Already admin", role: "admin" });
       }
 
-      // Create or update to admin role
       let role;
       if (existingRole) {
-        role = await storage.updateUserRole(userId, "admin");
+        role = await storage.updateUserRole(user.seatUserId, "admin");
       } else {
-        role = await storage.createUserRole({ userId, role: "admin" });
+        role = await storage.createUserRole({ seatUserId: user.seatUserId, role: "admin" });
       }
 
       res.json({ message: "Bootstrapped as admin", role: role?.role });
@@ -696,4 +649,8 @@ export async function registerRoutes(
   });
 
   return httpServer;
+}
+
+export function createHttpServer(app: Express): Server {
+  return createServer(app);
 }

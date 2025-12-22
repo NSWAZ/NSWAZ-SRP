@@ -1,9 +1,7 @@
 import { 
-  users, 
   userRoles, 
   srpRequests,
   fleets,
-  type User,
   type UserRole,
   type InsertUserRole,
   type Fleet,
@@ -18,24 +16,24 @@ import { eq, desc, and, sql, count, gte } from "drizzle-orm";
 import { shipCatalogService } from "./services/shipCatalog";
 
 export interface IStorage {
-  // User roles
-  getUserRole(userId: string): Promise<UserRole | undefined>;
+  // User roles (mapped by seatUserId)
+  getUserRole(seatUserId: number): Promise<UserRole | undefined>;
   createUserRole(data: InsertUserRole): Promise<UserRole>;
-  updateUserRole(userId: string, role: string): Promise<UserRole | undefined>;
+  updateUserRole(seatUserId: number, role: string): Promise<UserRole | undefined>;
 
   // Fleets
-  getFleets(createdByUserId?: string): Promise<Fleet[]>;
+  getFleets(createdBySeatUserId?: number): Promise<Fleet[]>;
   getFleet(id: string): Promise<Fleet | undefined>;
   getActiveFleets(): Promise<Fleet[]>;
-  createFleet(userId: string, fcName: string, data: InsertFleet): Promise<Fleet>;
+  createFleet(seatUserId: number, fcName: string, data: InsertFleet): Promise<Fleet>;
   updateFleet(id: string, data: Partial<Fleet>): Promise<Fleet | undefined>;
 
   // SRP Requests
-  getSrpRequests(userId?: string, status?: string): Promise<SrpRequestWithDetails[]>;
+  getSrpRequests(seatUserId?: number, status?: string): Promise<SrpRequestWithDetails[]>;
   getSrpRequest(id: string): Promise<SrpRequestWithDetails | undefined>;
-  createSrpRequest(userId: string, data: InsertSrpRequest): Promise<SrpRequest>;
+  createSrpRequest(seatUserId: number, data: InsertSrpRequest): Promise<SrpRequest>;
   updateSrpRequest(id: string, data: Partial<SrpRequest>): Promise<SrpRequest | undefined>;
-  reviewSrpRequest(id: string, reviewerId: string, status: string, note?: string, payout?: number): Promise<SrpRequest | undefined>;
+  reviewSrpRequest(id: string, reviewerSeatUserId: number, status: string, note?: string, payout?: number): Promise<SrpRequest | undefined>;
 
   // Stats
   getDashboardStats(): Promise<DashboardStats>;
@@ -43,8 +41,8 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // User roles
-  async getUserRole(userId: string): Promise<UserRole | undefined> {
-    const [role] = await db.select().from(userRoles).where(eq(userRoles.userId, userId));
+  async getUserRole(seatUserId: number): Promise<UserRole | undefined> {
+    const [role] = await db.select().from(userRoles).where(eq(userRoles.seatUserId, seatUserId));
     return role || undefined;
   }
 
@@ -53,20 +51,20 @@ export class DatabaseStorage implements IStorage {
     return role;
   }
 
-  async updateUserRole(userId: string, role: string): Promise<UserRole | undefined> {
+  async updateUserRole(seatUserId: number, role: string): Promise<UserRole | undefined> {
     const [updated] = await db
       .update(userRoles)
       .set({ role: role as any })
-      .where(eq(userRoles.userId, userId))
+      .where(eq(userRoles.seatUserId, seatUserId))
       .returning();
     return updated || undefined;
   }
 
   // Fleets
-  async getFleets(createdByUserId?: string): Promise<Fleet[]> {
-    if (createdByUserId) {
+  async getFleets(createdBySeatUserId?: number): Promise<Fleet[]> {
+    if (createdBySeatUserId) {
       return await db.select().from(fleets)
-        .where(eq(fleets.createdByUserId, createdByUserId))
+        .where(eq(fleets.createdBySeatUserId, createdBySeatUserId))
         .orderBy(desc(fleets.scheduledAt));
     }
     return await db.select().from(fleets)
@@ -90,10 +88,10 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(fleets.scheduledAt));
   }
 
-  async createFleet(userId: string, fcName: string, data: InsertFleet): Promise<Fleet> {
+  async createFleet(seatUserId: number, fcName: string, data: InsertFleet): Promise<Fleet> {
     const [fleet] = await db.insert(fleets).values({
       ...data,
-      createdByUserId: userId,
+      createdBySeatUserId: seatUserId,
       fcCharacterName: fcName,
       status: "active",
     }).returning();
@@ -109,10 +107,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // SRP Requests
-  async getSrpRequests(userId?: string, status?: string): Promise<SrpRequestWithDetails[]> {
+  async getSrpRequests(seatUserId?: number, status?: string): Promise<SrpRequestWithDetails[]> {
     let conditions = [];
-    if (userId) {
-      conditions.push(eq(srpRequests.userId, userId));
+    if (seatUserId) {
+      conditions.push(eq(srpRequests.seatUserId, seatUserId));
     }
     if (status && status !== "all") {
       conditions.push(eq(srpRequests.status, status as any));
@@ -124,14 +122,6 @@ export class DatabaseStorage implements IStorage {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(srpRequests.createdAt));
 
-    // Get pilot names
-    const userIds = Array.from(new Set(requests.map(r => r.userId)));
-    const pilotUsers = userIds.length > 0 
-      ? await db.select().from(users).where(sql`${users.id} = ANY(ARRAY[${sql.join(userIds.map(id => sql`${id}`), sql`, `)}])`)
-      : [];
-    
-    const userMap = new Map(pilotUsers.map(u => [u.id, u]));
-
     // Get fleet info for requests that have fleetId
     const fleetIds = Array.from(new Set(requests.filter(r => r.fleetId).map(r => r.fleetId!)));
     const fleetList = fleetIds.length > 0
@@ -141,13 +131,12 @@ export class DatabaseStorage implements IStorage {
 
     return requests.map(r => {
       const shipData = shipCatalogService.getShipByTypeId(r.shipTypeId);
-      const user = userMap.get(r.userId);
       const fleet = r.fleetId ? fleetMap.get(r.fleetId) : undefined;
       
       return {
         ...r,
         shipData: shipData,
-        pilotName: user?.characterName || "알 수 없는 파일럿",
+        pilotName: r.victimCharacterName || "알 수 없는 파일럿",
         fleet,
       };
     });
@@ -163,9 +152,8 @@ export class DatabaseStorage implements IStorage {
 
     const shipData = shipCatalogService.getShipByTypeId(request.shipTypeId);
     
-    // Get pilot name
-    const [pilot] = await db.select().from(users).where(eq(users.id, request.userId));
-    const pilotName = pilot?.characterName || "알 수 없는 파일럿";
+    // Use victimCharacterName as pilotName
+    const pilotName = request.victimCharacterName || "알 수 없는 파일럿";
 
     // Get fleet info if linked
     let fleet = undefined;
@@ -182,7 +170,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async createSrpRequest(userId: string, data: InsertSrpRequest): Promise<SrpRequest> {
+  async createSrpRequest(seatUserId: number, data: InsertSrpRequest): Promise<SrpRequest> {
     // Get ship name from catalog for denormalization
     const shipData = shipCatalogService.getShipByTypeId(data.shipTypeId);
     
@@ -190,7 +178,7 @@ export class DatabaseStorage implements IStorage {
       .insert(srpRequests)
       .values({
         ...data,
-        userId,
+        seatUserId,
         shipTypeName: shipData?.typeName || null,
         status: "pending",
       })
@@ -209,7 +197,7 @@ export class DatabaseStorage implements IStorage {
 
   async reviewSrpRequest(
     id: string, 
-    reviewerId: string, 
+    reviewerSeatUserId: number, 
     status: string, 
     note?: string, 
     payout?: number
@@ -218,7 +206,7 @@ export class DatabaseStorage implements IStorage {
       .update(srpRequests)
       .set({
         status: status as any,
-        reviewerId,
+        reviewerSeatUserId,
         reviewerNote: note || null,
         payoutAmount: payout || null,
         reviewedAt: new Date(),
