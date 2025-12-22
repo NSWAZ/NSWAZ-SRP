@@ -64,6 +64,15 @@ function getStatusIcon(status: string) {
   }
 }
 
+function formatIsk(amount: number): string {
+  if (amount >= 1000000000) {
+    return `${(amount / 1000000000).toFixed(2)}B ISK`;
+  } else if (amount >= 1000000) {
+    return `${(amount / 1000000).toFixed(1)}M ISK`;
+  }
+  return `${amount.toLocaleString()} ISK`;
+}
+
 function formatDate(date: string | Date | null): string {
   if (!date) return "-";
   return new Date(date).toLocaleDateString("ko-KR", {
@@ -230,13 +239,13 @@ export default function RequestDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-muted-foreground">청구 금액</Label>
-                <p className="font-mono text-lg font-bold">{request.iskAmount}M ISK</p>
+                <p className="font-mono text-lg font-bold">{formatIsk(request.iskAmount)}</p>
               </div>
               {request.payoutAmount && (
                 <div>
                   <Label className="text-muted-foreground">지급 금액</Label>
                   <p className="font-mono text-lg font-bold text-green-600">
-                    {request.payoutAmount}M ISK
+                    {formatIsk(request.payoutAmount)}
                   </p>
                 </div>
               )}
