@@ -222,12 +222,12 @@ export default function AllRequests() {
                         {request.pilotName || "알 수 없음"}
                       </TableCell>
                       <TableCell>
-                        {request.shipData?.typeName || request.shipTypeName || "알 수 없음"}
+                        {request.shipData?.typeName || "알 수 없음"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <div className="flex flex-col">
-                          <span>{request.fleet?.operationName || request.fleetName || "-"}</span>
-                          <span className="text-xs">{request.fleet?.fcCharacterName || request.fcName}</span>
+                          <span>{request.fleet?.operationName || "-"}</span>
+                          <span className="text-xs">{request.fleet?.fcCharacterName || "-"}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono">
@@ -267,7 +267,7 @@ export default function AllRequests() {
                             data-testid={`button-killmail-${request.id}`}
                           >
                             <a
-                              href={request.killmailUrl}
+                              href={`https://zkillboard.com/kill/${request.killmailId}/`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

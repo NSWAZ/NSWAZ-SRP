@@ -184,9 +184,7 @@ export default function NewRequest() {
       }
       return apiRequest("POST", "/api/srp-requests", {
         killmailId: parsedData.killmailId,
-        killmailUrl: data.killmailUrl,
         shipTypeId: parsedData.shipTypeId,
-        shipTypeName: parsedData.shipTypeName,
         iskAmount: parsedData.iskValue,
         operationType: data.operationType,
         isSpecialRole: data.isSpecialRole ? 1 : 0,

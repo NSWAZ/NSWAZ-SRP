@@ -120,7 +120,7 @@ export default function MyRequests() {
                             className="h-6 w-6"
                           />
                           <span className="font-medium">
-                            {request.shipData?.typeName || request.shipTypeName || "알 수 없음"}
+                            {request.shipData?.typeName || "알 수 없음"}
                           </span>
                         </div>
                       </TableCell>
@@ -152,7 +152,7 @@ export default function MyRequests() {
                             data-testid={`button-view-killmail-${request.id}`}
                           >
                             <a
-                              href={request.killmailUrl}
+                              href={`https://zkillboard.com/kill/${request.killmailId}/`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

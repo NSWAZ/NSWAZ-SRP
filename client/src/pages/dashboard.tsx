@@ -180,7 +180,7 @@ export default function Dashboard() {
                       />
                       <div>
                         <p className="font-medium">
-                          {request.shipData?.typeName || request.shipTypeName || "알 수 없는 함선"}
+                          {request.shipData?.typeName || "알 수 없는 함선"}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {request.createdAt && formatTimeAgo(request.createdAt)}

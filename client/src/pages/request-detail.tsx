@@ -218,7 +218,7 @@ export default function RequestDetail() {
               <div>
                 <Label className="text-muted-foreground">함선 유형</Label>
                 <p className="font-medium">
-                  {request.shipData?.typeName || request.shipTypeName || "알 수 없음"}
+                  {request.shipData?.typeName || "알 수 없음"}
                 </p>
               </div>
               <div>
@@ -283,17 +283,6 @@ export default function RequestDetail() {
                   </div>
                 )}
               </div>
-            ) : request.fleetName ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">함대명</Label>
-                  <p className="font-medium">{request.fleetName}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">FC 이름</Label>
-                  <p className="font-medium">{request.fcName || "-"}</p>
-                </div>
-              </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -311,7 +300,7 @@ export default function RequestDetail() {
             <div>
               <Label className="text-muted-foreground">킬메일</Label>
               <Button variant="outline" size="sm" asChild className="mt-2" data-testid="button-view-killmail">
-                <a href={request.killmailUrl} target="_blank" rel="noopener noreferrer">
+                <a href={`https://zkillboard.com/kill/${request.killmailId}/`} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2 h-4 w-4" />
                   zKillboard에서 보기
                 </a>
