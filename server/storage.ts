@@ -34,7 +34,8 @@ export interface IStorage {
   getSrpRequestByKillmailId(killmailId: number): Promise<SrpRequest | undefined>;
   createSrpRequest(seatUserId: number, data: InsertSrpRequest): Promise<SrpRequest>;
   updateSrpRequest(id: string, data: Partial<SrpRequest>): Promise<SrpRequest | undefined>;
-  reviewSrpRequest(id: string, reviewerSeatUserId: number, status: string, note?: string, payout?: number): Promise<SrpRequest | undefined>;
+  reviewSrpRequest(id: string, reviewerName: string, status: string, note?: string, payout?: number): Promise<SrpRequest | undefined>;
+  markSrpRequestPaid(id: string): Promise<SrpRequest | undefined>;
 
   // Stats
   getDashboardStats(): Promise<DashboardStats>;
@@ -180,15 +181,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSrpRequest(seatUserId: number, data: InsertSrpRequest): Promise<SrpRequest> {
-    // Get ship name from catalog for denormalization
-    const shipData = shipCatalogService.getShipByTypeId(data.shipTypeId);
-    
     const [request] = await db
       .insert(srpRequests)
       .values({
         ...data,
         seatUserId,
-        shipTypeName: shipData?.typeName || null,
         status: "pending",
       })
       .returning();
@@ -198,7 +195,7 @@ export class DatabaseStorage implements IStorage {
   async updateSrpRequest(id: string, data: Partial<SrpRequest>): Promise<SrpRequest | undefined> {
     const [updated] = await db
       .update(srpRequests)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data })
       .where(eq(srpRequests.id, id))
       .returning();
     return updated || undefined;
@@ -206,7 +203,7 @@ export class DatabaseStorage implements IStorage {
 
   async reviewSrpRequest(
     id: string, 
-    reviewerSeatUserId: number, 
+    reviewerName: string, 
     status: string, 
     note?: string, 
     payout?: number
@@ -215,11 +212,21 @@ export class DatabaseStorage implements IStorage {
       .update(srpRequests)
       .set({
         status: status as any,
-        reviewerSeatUserId,
+        reviewerName,
         reviewerNote: note || null,
         payoutAmount: payout || null,
         reviewedAt: new Date(),
-        updatedAt: new Date(),
+      })
+      .where(eq(srpRequests.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async markSrpRequestPaid(id: string): Promise<SrpRequest | undefined> {
+    const [updated] = await db
+      .update(srpRequests)
+      .set({
+        paidAt: new Date(),
       })
       .where(eq(srpRequests.id, id))
       .returning();

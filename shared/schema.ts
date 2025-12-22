@@ -176,7 +176,6 @@ export type SrpCalculateResponse = {
 export type SrpRequestWithDetails = SrpRequest & {
   shipData?: ShipData;
   pilotName?: string;
-  reviewerName?: string;
   fleet?: Fleet;
 };
 

@@ -581,9 +581,6 @@ export async function registerRoutes(
             message: "유효하지 않은 플릿 UUID입니다. FC에게 올바른 UUID를 받으세요." 
           });
         }
-        
-        validated.fleetName = fleet.operationName;
-        validated.fcName = fleet.fcCharacterName;
       }
       
       const request = await storage.createSrpRequest(user.seatUserId, validated);
@@ -617,7 +614,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const request = await storage.reviewSrpRequest(id, user.seatUserId, status, reviewerNote, payoutAmount);
+      const reviewerName = user.mainCharacterName;
+      const request = await storage.reviewSrpRequest(id, reviewerName, status, reviewerNote, payoutAmount);
       
       if (!request) {
         return res.status(404).json({ message: "Request not found" });
