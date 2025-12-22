@@ -526,7 +526,7 @@ export default function NewRequest() {
               <div className="flex gap-3">
                 <Button
                   type="submit"
-                  disabled={submitMutation.isPending || !parsedData || isParsing}
+                  disabled={submitMutation.isPending || !parsedData || isParsing || parsedData?.isOwnedCharacter === false}
                   data-testid="button-submit"
                 >
                   {submitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
