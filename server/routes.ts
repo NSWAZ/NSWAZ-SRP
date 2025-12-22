@@ -268,20 +268,26 @@ export async function registerRoutes(
       const shipTypeId = esiData.victim.ship_type_id;
       const victimCharacterId = esiData.victim.character_id;
 
-      // Check if victim character belongs to user
-      const userId = req.session.userId!;
+      // Check if victim character belongs to user using session data from SeAT
+      const associatedCharacterIds = req.session.associatedCharacterIds || [];
       let isOwnedCharacter = false;
       let victimCharacterName: string | undefined;
 
       if (victimCharacterId) {
-        const [char] = await db.select()
-          .from(userCharacters)
-          .where(eq(userCharacters.characterId, victimCharacterId))
-          .limit(1);
+        // Check ownership using session-stored associated character IDs from SeAT
+        isOwnedCharacter = associatedCharacterIds.includes(victimCharacterId);
         
-        if (char && char.userId === userId) {
-          isOwnedCharacter = true;
-          victimCharacterName = char.characterName;
+        // Fetch character name from ESI if owned
+        if (isOwnedCharacter || associatedCharacterIds.length === 0) {
+          try {
+            const charResponse = await fetch(`https://esi.evetech.net/latest/characters/${victimCharacterId}/`);
+            if (charResponse.ok) {
+              const charData = await charResponse.json() as { name: string };
+              victimCharacterName = charData.name;
+            }
+          } catch {
+            // Ignore ESI errors for character name lookup
+          }
         }
       }
 
@@ -453,13 +459,16 @@ export async function registerRoutes(
         });
       }
       
-      // Validate character ownership - must be one of the user's characters
-      const [char] = await db.select()
-        .from(userCharacters)
-        .where(eq(userCharacters.characterId, validated.victimCharacterId))
-        .limit(1);
+      // Validate character ownership using session-stored associated character IDs from SeAT
+      const associatedCharacterIds = req.session.associatedCharacterIds || [];
       
-      if (!char || char.userId !== userId) {
+      if (associatedCharacterIds.length === 0) {
+        return res.status(403).json({ 
+          message: "SeAT에서 캐릭터 정보를 가져올 수 없습니다. 다시 로그인해주세요." 
+        });
+      }
+      
+      if (!associatedCharacterIds.includes(validated.victimCharacterId)) {
         return res.status(403).json({ 
           message: "이 킬메일은 본인 소유의 캐릭터가 아닙니다. 캐릭터를 동기화하거나 본인의 로스만 SRP 신청 가능합니다." 
         });
