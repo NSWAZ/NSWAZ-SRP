@@ -86,6 +86,7 @@ export const insertFleetSchema = createInsertSchema(fleets).omit({
 });
 export const insertSrpRequestSchema = createInsertSchema(srpRequests).omit({ 
   id: true, 
+  userId: true, // Set from session, not from request body
   createdAt: true, 
   updatedAt: true,
   reviewedAt: true,
