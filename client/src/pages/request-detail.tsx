@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, useLocation, Link } from "wouter";
+import { useRoute, useLocation, Link, useSearch } from "wouter";
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -23,6 +23,11 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +94,9 @@ type ReviewAction = "approve" | "deny" | null;
 export default function RequestDetail() {
   const [, params] = useRoute("/request/:id");
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const fromPage = searchParams.get("from");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -98,6 +106,14 @@ export default function RequestDetail() {
   });
   const [reviewNote, setReviewNote] = useState("");
   const [payoutAmount, setPayoutAmount] = useState<number>(0);
+  
+  const handleBack = () => {
+    if (fromPage === "all-requests") {
+      setLocation("/all-requests");
+    } else {
+      setLocation("/my-requests");
+    }
+  };
 
   const { data: request, isLoading } = useQuery<SrpRequestWithDetails>({
     queryKey: [`/api/srp-requests/${params?.id}`],
@@ -197,9 +213,14 @@ export default function RequestDetail() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/my-requests")} data-testid="button-back">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>뒤로 가기</TooltipContent>
+        </Tooltip>
         <div className="flex-1">
           <h1 className="text-3xl font-bold" data-testid="text-page-title">요청 상세</h1>
           <p className="text-muted-foreground">

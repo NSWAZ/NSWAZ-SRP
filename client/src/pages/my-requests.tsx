@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PlusCircle, ExternalLink, FileText } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +102,7 @@ export default function MyRequests() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>로스 날짜</TableHead>
+                    <TableHead>요청 날짜</TableHead>
                     <TableHead>로스 함선</TableHead>
                     <TableHead>캐릭터</TableHead>
                     <TableHead>유형</TableHead>
@@ -148,31 +153,41 @@ export default function MyRequests() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                            data-testid={`button-view-killmail-${request.id}`}
-                          >
-                            <a
-                              href={`https://zkillboard.com/kill/${request.killmailId}/`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                            data-testid={`button-view-details-${request.id}`}
-                          >
-                            <Link href={`/request/${request.id}`}>
-                              <FileText className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                        <div className="flex justify-end gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                asChild
+                                data-testid={`button-view-killmail-${request.id}`}
+                              >
+                                <a
+                                  href={`https://zkillboard.com/kill/${request.killmailId}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>zKillboard에서 보기</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                asChild
+                                data-testid={`button-view-details-${request.id}`}
+                              >
+                                <Link href={`/request/${request.id}`}>
+                                  <FileText className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>상세 보기</TooltipContent>
+                          </Tooltip>
                         </div>
                       </TableCell>
                     </TableRow>

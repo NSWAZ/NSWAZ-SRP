@@ -7,8 +7,15 @@ import {
   CheckCircle, 
   XCircle, 
   Clock,
-  Filter 
+  Filter,
+  Users,
+  User
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +80,15 @@ function formatDate(date: string | Date | null): string {
   });
 }
 
+function formatIsk(amount: number): string {
+  if (amount >= 1000000000) {
+    return `${(amount / 1000000000).toFixed(2)}B`;
+  } else if (amount >= 1000000) {
+    return `${(amount / 1000000).toFixed(1)}M`;
+  }
+  return `${amount.toLocaleString()}`;
+}
+
 type ReviewAction = "approve" | "deny" | null;
 
 export default function AllRequests() {
@@ -88,6 +104,7 @@ export default function AllRequests() {
 
   const { data: requests, isLoading } = useQuery<SrpRequestWithDetails[]>({
     queryKey: [`/api/srp-requests/all/${statusFilter}`],
+    refetchOnMount: "always",
   });
 
   const reviewMutation = useMutation({
@@ -203,9 +220,10 @@ export default function AllRequests() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>로스 날짜</TableHead>
+                    <TableHead>요청 날짜</TableHead>
                     <TableHead>파일럿</TableHead>
                     <TableHead>로스 함선</TableHead>
+                    <TableHead>유형</TableHead>
                     <TableHead>함대 / FC</TableHead>
                     <TableHead className="text-right">로스 금액</TableHead>
                     <TableHead>상태</TableHead>
@@ -222,7 +240,26 @@ export default function AllRequests() {
                         {request.pilotName || "알 수 없음"}
                       </TableCell>
                       <TableCell>
-                        {request.shipData?.typeName || "알 수 없음"}
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={`https://images.evetech.net/types/${request.shipTypeId}/icon?size=32`}
+                            alt=""
+                            className="h-6 w-6"
+                          />
+                          <span>{request.shipData?.typeName || "알 수 없음"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={request.operationType === "fleet" ? "secondary" : "outline"} 
+                          className={`text-xs ${request.operationType === "solo" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800" : ""}`}
+                        >
+                          {request.operationType === "fleet" ? (
+                            <><Users className="h-3 w-3 mr-1" />플릿</>
+                          ) : (
+                            <><User className="h-3 w-3 mr-1" />솔로</>
+                          )}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <div className="flex flex-col">
@@ -231,7 +268,7 @@ export default function AllRequests() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {request.iskAmount}M
+                        {formatIsk(request.iskAmount)}
                       </TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(request.status)}>
@@ -242,48 +279,68 @@ export default function AllRequests() {
                         <div className="flex justify-end gap-1">
                           {request.status === "pending" && (
                             <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openReviewDialog(request, "approve")}
-                                data-testid={`button-approve-${request.id}`}
-                              >
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => openReviewDialog(request, "deny")}
-                                data-testid={`button-deny-${request.id}`}
-                              >
-                                <XCircle className="h-4 w-4 text-red-600" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openReviewDialog(request, "approve")}
+                                    data-testid={`button-approve-${request.id}`}
+                                  >
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>승인</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openReviewDialog(request, "deny")}
+                                    data-testid={`button-deny-${request.id}`}
+                                  >
+                                    <XCircle className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>거부</TooltipContent>
+                              </Tooltip>
                             </>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                            data-testid={`button-killmail-${request.id}`}
-                          >
-                            <a
-                              href={`https://zkillboard.com/kill/${request.killmailId}/`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                            data-testid={`button-details-${request.id}`}
-                          >
-                            <Link href={`/request/${request.id}`}>
-                              <FileText className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                asChild
+                                data-testid={`button-killmail-${request.id}`}
+                              >
+                                <a
+                                  href={`https://zkillboard.com/kill/${request.killmailId}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>zKillboard에서 보기</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                asChild
+                                data-testid={`button-details-${request.id}`}
+                              >
+                                <Link href={`/request/${request.id}?from=all-requests`}>
+                                  <FileText className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>상세 보기</TooltipContent>
+                          </Tooltip>
                         </div>
                       </TableCell>
                     </TableRow>

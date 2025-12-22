@@ -34,11 +34,11 @@ const memberItems = [
 
 const fcItems = [
   { title: "플릿 관리", url: "/fleet-management", icon: Users },
+  { title: "요청 관리", url: "/all-requests", icon: ClipboardCheck },
 ];
 
 const adminItems = [
-  { title: "All Requests", url: "/all-requests", icon: ClipboardCheck },
-  { title: "Ship Types", url: "/ship-types", icon: Settings },
+  { title: "함선 유형 관리", url: "/ship-types", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -104,6 +104,11 @@ export function AppSidebar() {
                       <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
+                        {item.title === "요청 관리" && pendingCount > 0 && (
+                          <Badge variant="destructive" className="ml-auto" data-testid="badge-pending-count">
+                            {pendingCount}
+                          </Badge>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -113,11 +118,11 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isAdmin && (
+        {userRole?.role === "admin" && (
           <SidebarGroup>
             <SidebarGroupLabel className="flex items-center gap-2">
               <Shield className="h-3 w-3" />
-              Administration
+              관리자 도구
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -127,11 +132,6 @@ export function AppSidebar() {
                       <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
-                        {item.title === "All Requests" && pendingCount > 0 && (
-                          <Badge variant="destructive" className="ml-auto" data-testid="badge-pending-count">
-                            {pendingCount}
-                          </Badge>
-                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
