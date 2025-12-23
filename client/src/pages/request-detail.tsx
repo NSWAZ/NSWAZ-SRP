@@ -189,7 +189,7 @@ export default function RequestDetail() {
 
         if (response.ok) {
           const data = await response.json();
-          setPayoutAmount(data.calculatedAmount);
+          setPayoutAmount(data.estimatedPayout);
         } else {
           setPayoutAmount(request.iskAmount);
         }
