@@ -484,53 +484,46 @@ export default function RequestDetail() {
                   <div className="flex items-center justify-center py-4">
                     <span className="text-sm text-muted-foreground">SRP 금액 계산 중...</span>
                   </div>
-                ) : calculatedPayout && (
-                  <div className="p-3 rounded-md bg-primary/5 border border-primary/20">
-                    <div className="text-sm text-muted-foreground mb-1">예상 SRP 지급액</div>
-                    <div className="text-lg font-bold text-primary">
-                      {formatIsk(calculatedPayout.estimatedPayout)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                      <div>
-                        {request?.operationType === "fleet" 
-                          ? (calculatedPayout.breakdown.isSpecialRole ? "플릿 + 특수롤 (100%)" : "플릿 (50%)")
-                          : calculatedPayout.breakdown.isSpecialShipClass 
-                            ? "솔로잉 + 지원함급 보너스 (100%)" 
-                            : "솔로잉 (25%)"
-                        }
+                ) : (
+                  <>
+                    {calculatedPayout && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>
+                          {request?.operationType === "fleet" 
+                            ? (calculatedPayout.breakdown.isSpecialRole ? "플릿 + 특수롤 (100%)" : "플릿 (50%)")
+                            : calculatedPayout.breakdown.isSpecialShipClass 
+                              ? "솔로잉 + 지원함급 (100%)" 
+                              : "솔로잉 (25%)"
+                          }
+                          {(() => {
+                            const { baseValue, operationMultiplier, finalAmount, maxPayout } = calculatedPayout.breakdown;
+                            const calculatedAmount = baseValue * operationMultiplier;
+                            if (finalAmount < calculatedAmount && maxPayout < calculatedAmount) {
+                              const reductionPercent = Math.round((1 - finalAmount / calculatedAmount) * 100);
+                              return <span className="text-amber-600 dark:text-amber-400 ml-2">함급 제한 -{reductionPercent}%</span>;
+                            }
+                            return null;
+                          })()}
+                        </span>
                       </div>
-                      {(() => {
-                        const { baseValue, operationMultiplier, finalAmount, maxPayout } = calculatedPayout.breakdown;
-                        const calculatedAmount = baseValue * operationMultiplier;
-                        if (finalAmount < calculatedAmount && maxPayout < calculatedAmount) {
-                          const reductionPercent = Math.round((1 - finalAmount / calculatedAmount) * 100);
-                          return (
-                            <div className="text-amber-600 dark:text-amber-400">
-                              함급별 총액 제한 (-{reductionPercent}%)
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                    )}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="payout">지급 금액</Label>
+                        <span className="text-lg font-bold text-primary">{formatIsk(payoutAmount)}</span>
+                      </div>
+                      <Input
+                        id="payout"
+                        type="number"
+                        value={payoutAmount}
+                        onChange={(e) => setPayoutAmount(Number(e.target.value))}
+                        disabled={isCalculating}
+                        className="font-mono"
+                        data-testid="input-payout-amount"
+                      />
                     </div>
-                  </div>
+                  </>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="payout">지급 금액 (ISK) - 수정 가능</Label>
-                  <Input
-                    id="payout"
-                    type="number"
-                    value={payoutAmount}
-                    onChange={(e) => setPayoutAmount(Number(e.target.value))}
-                    disabled={isCalculating}
-                    data-testid="input-payout-amount"
-                  />
-                  {!isCalculating && payoutAmount > 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      {formatIsk(payoutAmount)}
-                    </p>
-                  )}
-                </div>
               </div>
             )}
             <div className="space-y-2">
