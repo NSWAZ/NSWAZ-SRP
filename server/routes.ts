@@ -628,34 +628,6 @@ export async function registerRoutes(
     }
   });
 
-  // Make first user admin (bootstrap endpoint)
-  app.post("/api/admin/bootstrap", isAuthenticated, async (req: Request, res) => {
-    try {
-      const user = req.session.user;
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      const existingRole = await storage.getUserRole(user.seatUserId);
-      
-      if (existingRole?.role === "admin") {
-        return res.json({ message: "Already admin", role: "admin" });
-      }
-
-      let role;
-      if (existingRole) {
-        role = await storage.updateUserRole(user.seatUserId, "admin");
-      } else {
-        role = await storage.createUserRole({ seatUserId: user.seatUserId, role: "admin" });
-      }
-
-      res.json({ message: "Bootstrapped as admin", role: role?.role });
-    } catch (error) {
-      console.error("Error bootstrapping admin:", error);
-      res.status(500).json({ message: "Failed to bootstrap admin" });
-    }
-  });
-
   return httpServer;
 }
 
