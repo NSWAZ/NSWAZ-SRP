@@ -6,6 +6,7 @@ import { insertSrpRequestSchema, srpCalculateSchema, fleetFormSchema, type SrpCa
 import { z } from "zod";
 import { shipCatalogService } from "./services/shipCatalog";
 import { srpLimitsService } from "./services/srpLimits";
+import { requireRole } from "./middleware/requireRole";
 
 // SRP Policy constants
 const SRP_POLICY = {
@@ -220,17 +221,11 @@ export async function registerRoutes(
   });
 
   // Create fleet (FC/Admin only)
-  app.post("/api/fleets", isAuthenticated, async (req: Request, res) => {
+  app.post("/api/fleets", isAuthenticated, requireRole("fc"), async (req: Request, res) => {
     try {
       const user = req.session.user;
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      // Check if user has FC or admin role
-      const userRole = await storage.getUserRole(user.seatUserId);
-      if (!userRole || !["fc", "admin"].includes(userRole.role)) {
-        return res.status(403).json({ message: "플릿 생성은 FC 또는 관리자만 가능합니다" });
       }
       
       // Validate request body
@@ -265,7 +260,7 @@ export async function registerRoutes(
   });
 
   // Update fleet status (FC owner or Admin only)
-  app.patch("/api/fleets/:id/status", isAuthenticated, async (req: Request, res) => {
+  app.patch("/api/fleets/:id/status", isAuthenticated, requireRole("fc"), async (req: Request, res) => {
     try {
       const user = req.session.user;
       if (!user) {
@@ -284,7 +279,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "플릿을 찾을 수 없습니다" });
       }
       
-      // Check permission (owner or admin)
+      // Check permission (owner or admin can modify)
       const userRole = await storage.getUserRole(user.seatUserId);
       if (fleet.createdBySeatUserId !== user.seatUserId && userRole?.role !== "admin") {
         return res.status(403).json({ message: "권한이 없습니다" });
@@ -471,19 +466,9 @@ export async function registerRoutes(
     }
   });
 
-  // SRP Requests - all requests (admin only)
-  app.get("/api/srp-requests/all/:status?", isAuthenticated, async (req: Request, res) => {
+  // SRP Requests - all requests (FC/Admin only)
+  app.get("/api/srp-requests/all/:status?", isAuthenticated, requireRole("fc"), async (req: Request, res) => {
     try {
-      const user = req.session.user;
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      const userRole = await storage.getUserRole(user.seatUserId);
-      
-      if (!userRole || !["admin", "fc"].includes(userRole.role)) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
       const { status } = req.params;
       const requests = await storage.getSrpRequests(undefined, status);
       res.json(requests);
@@ -594,17 +579,12 @@ export async function registerRoutes(
     }
   });
 
-  // Review SRP request (approve/deny) - admin only
-  app.patch("/api/srp-requests/:id/review", isAuthenticated, async (req: Request, res) => {
+  // Review SRP request (approve/deny) - FC/Admin only
+  app.patch("/api/srp-requests/:id/review", isAuthenticated, requireRole("fc"), async (req: Request, res) => {
     try {
       const user = req.session.user;
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
-      }
-      const userRole = await storage.getUserRole(user.seatUserId);
-      
-      if (!userRole || !["admin", "fc"].includes(userRole.role)) {
-        return res.status(403).json({ message: "Forbidden" });
       }
 
       const { id } = req.params;
