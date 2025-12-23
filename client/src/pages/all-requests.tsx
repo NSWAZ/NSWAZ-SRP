@@ -273,6 +273,7 @@ export default function AllRequests() {
                     <TableHead>유형</TableHead>
                     <TableHead>함대 / FC</TableHead>
                     <TableHead className="text-right">로스 금액</TableHead>
+                    <TableHead className="text-right">지급 금액</TableHead>
                     <TableHead>상태</TableHead>
                     <TableHead className="text-right">작업</TableHead>
                   </TableRow>
@@ -316,6 +317,13 @@ export default function AllRequests() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatIsk(request.iskAmount)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {request.payoutAmount ? (
+                          <span className="text-green-600 dark:text-green-400">{formatIsk(request.payoutAmount)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(request.status)}>
