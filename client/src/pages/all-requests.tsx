@@ -132,7 +132,7 @@ export default function AllRequests() {
         title: "요청 업데이트 완료",
         description: `요청이 ${reviewDialog.action === "approve" ? "승인" : "거부"}되었습니다.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/srp-requests"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/srp-requests/all/${statusFilter}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       closeDialog();
     },
