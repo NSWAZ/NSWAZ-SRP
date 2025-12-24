@@ -150,7 +150,7 @@ export function AppSidebar() {
           )}
           {userRole && (
             <Badge 
-              variant={userRole.role === "admin" ? "default" : "secondary"}
+              variant={userRole.role === "admin" ? "destructive" : userRole.role === "fc" ? "default" : "secondary"}
               data-testid="badge-user-role"
             >
               {userRole.role.toUpperCase()}

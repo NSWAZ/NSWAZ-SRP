@@ -16,13 +16,13 @@ import backgroundImage from "@assets/Nag1_1766304787177.png";
 interface TestCharacter {
   characterId: number;
   name: string;
-  role: "member" | "fc";
+  role: "member" | "fc" | "admin";
   roleLabel: string;
 }
 
 const testCharacters: TestCharacter[] = [
-  { characterId: 96386549, name: "Test Member", role: "member", roleLabel: "멤버" },
-  { characterId: 94403590, name: "Test FC", role: "fc", roleLabel: "FC" },
+  { characterId: 96386549, name: "Test Admin", role: "admin", roleLabel: "관리자" },
+  { characterId: 95185257, name: "Test Member", role: "member", roleLabel: "멤버" },
 ];
 
 export default function Landing() {
@@ -188,8 +188,10 @@ export default function Landing() {
                   />
                   <span className="font-medium">{char.name}</span>
                 </div>
-                <Badge variant={char.role === "fc" ? "default" : "secondary"}>
-                  {char.role === "fc" ? (
+                <Badge variant={char.role === "admin" ? "destructive" : char.role === "fc" ? "default" : "secondary"}>
+                  {char.role === "admin" ? (
+                    <Shield className="mr-1 h-3 w-3" />
+                  ) : char.role === "fc" ? (
                     <Shield className="mr-1 h-3 w-3" />
                   ) : (
                     <User className="mr-1 h-3 w-3" />
