@@ -244,13 +244,14 @@ export class DatabaseStorage implements IStorage {
         eq(srpRequests.status, "pending")
       ));
 
-    // PERSONAL: User's total received payout
+    // PERSONAL: User's total received payout (only actually paid ones)
     const [paidResult] = await db
       .select({ total: sql<number>`COALESCE(SUM(${srpRequests.payoutAmount}), 0)` })
       .from(srpRequests)
       .where(and(
         eq(srpRequests.seatUserId, seatUserId),
-        eq(srpRequests.status, "approved")
+        eq(srpRequests.status, "approved"),
+        sql`${srpRequests.paidAt} IS NOT NULL`
       ));
 
     // GLOBAL: Approved today (all users)
