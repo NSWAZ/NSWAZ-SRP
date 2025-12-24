@@ -22,6 +22,7 @@ interface TestCharacter {
 
 const testCharacters: TestCharacter[] = [
   { characterId: 96386549, name: "Test Admin", role: "admin", roleLabel: "관리자" },
+  { characterId: 94403590, name: "Test FC", role: "fc", roleLabel: "FC" },
   { characterId: 95185257, name: "Test Member", role: "member", roleLabel: "멤버" },
 ];
 
