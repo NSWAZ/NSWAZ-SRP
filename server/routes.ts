@@ -86,10 +86,14 @@ export async function registerRoutes(
     }
   });
 
-  // Dashboard stats
-  app.get("/api/stats", isAuthenticated, async (req, res) => {
+  // Dashboard stats (personal stats for the logged-in user)
+  app.get("/api/stats", isAuthenticated, async (req: Request, res) => {
     try {
-      const stats = await storage.getDashboardStats();
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const stats = await storage.getDashboardStats(user.seatUserId);
       res.json(stats);
     } catch (error) {
       console.error("Error getting stats:", error);
