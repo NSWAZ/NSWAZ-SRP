@@ -18,9 +18,9 @@ export type SessionUserData = {
   mainCharacterId: number;
   mainCharacterName: string;
   profileImageUrl: string;
-  corporationId?: number;
-  corporationName?: string;
-  allianceId?: number;
-  allianceName?: string;
+  mainCharacterCorporationId?: number;
+  mainCharacterCorporationName?: string;
+  mainCharacterAllianceId?: number;
+  mainCharacterAllianceName?: string;
   associatedCharacterIds: number[];
 };

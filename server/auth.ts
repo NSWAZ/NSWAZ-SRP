@@ -128,30 +128,42 @@ async function getCharacterInfo(accessToken: string): Promise<EveCharacterInfo> 
 
 async function fetchUserDataFromSeat(characterId: number): Promise<SessionUserData | null> {
   try {
-    // Get SeAT user ID from character
-    const seatUserId = await seatApiService.getSeatUserIdForCharacter(characterId);
+    // 1) character sheet → user_id
+    const sheet = await seatApiService.getCharacterSheet(characterId);
+    const seatUserId = sheet?.user_id;
     if (!seatUserId) {
       console.error(`Could not find SeAT user for character ${characterId}`);
       return null;
     }
 
-    // Get associated character IDs
-    const associatedCharacterIds = await seatApiService.getAssociatedCharacterIds(characterId);
-    
-    // Get character sheet for additional info
-    const characterSheet = await seatApiService.getCharacterSheet(characterId);
-    
-    const profileImageUrl = `https://images.evetech.net/characters/${characterId}/portrait?size=128`;
+    // 2) user info → associated_character_ids, main_character_id
+    const userInfo = await seatApiService.getUserById(seatUserId);
+    if (!userInfo) {
+      console.error(`SeAT user ${seatUserId} not found for character ${characterId}`);
+      return null;
+    }
+    const associatedCharacterIds = userInfo.associated_character_ids || [];
+    const mainCharacterId = userInfo.main_character_id || characterId;
+
+    // 3) main character sheet → name/corp/alliance
+    const mainSheet = await seatApiService.getCharacterSheet(mainCharacterId);
+    const mainCharacterName = mainSheet?.name || `Character_${mainCharacterId}`;
+    const mainCharacterCorporationId = mainSheet?.corporation_id;
+    const mainCharacterCorporationName = mainSheet?.corporation?.name;
+    const mainCharacterAllianceId = mainSheet?.alliance_id;
+    const mainCharacterAllianceName = mainSheet?.alliance?.name;
+
+    const profileImageUrl = `https://images.evetech.net/characters/${mainCharacterId}/portrait?size=128`;
 
     return {
       seatUserId,
-      mainCharacterId: characterId,
-      mainCharacterName: characterSheet?.name || `Character_${characterId}`,
+      mainCharacterId,
+      mainCharacterName,
       profileImageUrl,
-      corporationId: characterSheet?.corporation_id,
-      corporationName: undefined,
-      allianceId: characterSheet?.alliance_id,
-      allianceName: undefined,
+      mainCharacterCorporationId,
+      mainCharacterCorporationName,
+      mainCharacterAllianceId,
+      mainCharacterAllianceName,
       associatedCharacterIds,
     };
   } catch (error) {
