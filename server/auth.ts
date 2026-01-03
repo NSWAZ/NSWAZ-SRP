@@ -225,6 +225,21 @@ export async function setupAuth(app: Express) {
         return res.redirect("/?error=seat_user_not_found");
       }
 
+      // Check corp/alliance restrictions
+      const allowedCorpIds = process.env.ALLOWED_CORP_IDS?.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) || [];
+      const allowedAllianceIds = process.env.ALLOWED_ALLIANCE_IDS?.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) || [];
+      
+      const hasRestrictions = allowedCorpIds.length > 0 || allowedAllianceIds.length > 0;
+      if (hasRestrictions) {
+        const isAllowedCorp = allowedCorpIds.length > 0 && userData.mainCharacterCorporationId && allowedCorpIds.includes(userData.mainCharacterCorporationId);
+        const isAllowedAlliance = allowedAllianceIds.length > 0 && userData.mainCharacterAllianceId && allowedAllianceIds.includes(userData.mainCharacterAllianceId);
+        
+        if (!isAllowedCorp && !isAllowedAlliance) {
+          console.log(`Access denied for ${userData.mainCharacterName}: corp=${userData.mainCharacterCorporationId}, alliance=${userData.mainCharacterAllianceId}`);
+          return res.redirect("/?error=access_denied");
+        }
+      }
+
       req.session.user = userData;
       req.session.accessToken = tokens.access_token;
       req.session.refreshToken = tokens.refresh_token;

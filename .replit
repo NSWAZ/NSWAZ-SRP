@@ -40,3 +40,9 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+ALLOWED_CORP_IDS = "98672349"
+ALLOWED_ALLIANCE_IDS = "99010412"
