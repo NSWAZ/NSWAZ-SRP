@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./eveAuth";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./auth";
 import { insertSrpRequestSchema, srpCalculateSchema, fleetFormSchema, type SrpCalculateResponse } from "@shared/schema";
 import { z } from "zod";
 import { shipCatalogService } from "./services/shipCatalog";
