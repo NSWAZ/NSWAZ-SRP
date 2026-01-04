@@ -17,7 +17,7 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/data ./data
+COPY --from=builder /app/server/staticData ./server/staticData
 
 RUN npm ci --omit=dev
 
