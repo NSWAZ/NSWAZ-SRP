@@ -40,4 +40,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eve-srp:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_TOKEN }}/eve-srp:buildcache,mode=max
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/eve-srp:buildcache,mode=max
