@@ -1,20 +1,24 @@
 const SEAT_API_BASE = "https://seat.nisuwaz.com";
 
+interface SeatEntity {
+  entity_id: number;
+  name: string;
+  category?: string;
+}
+
 interface SeatCharacterSheet {
   data: {
-    character_id: number;
+    character_id?: number;
     name: string;
-    corporation_id: number;
-    corporation?: {
-      name: string;
-    };
-    alliance_id?: number;
-    alliance?: {
-      name: string;
-    };
+    description?: string;
+    corporation?: SeatEntity;
+    alliance?: SeatEntity;
+    faction?: SeatEntity;
     user_id?: number;
   };
 }
+
+export type CharacterSheetData = SeatCharacterSheet["data"];
 
 interface SeatUserCharacters {
   data: Array<{

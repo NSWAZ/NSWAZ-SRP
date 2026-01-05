@@ -2,7 +2,7 @@ import session from "express-session";
 import type { Express, RequestHandler, Request, Response } from "express";
 import connectPg from "connect-pg-simple";
 import crypto from "crypto";
-import { seatApiService } from "./services/seatApi";
+import { seatApiService, type CharacterSheetData } from "./services/seatApi";
 import { storage } from "./storage";
 import type { SessionUserData } from "@shared/models/auth";
 
@@ -128,9 +128,22 @@ async function getCharacterInfo(accessToken: string): Promise<EveCharacterInfo> 
 
 async function fetchUserDataFromSeat(characterId: number): Promise<SessionUserData | null> {
   try {
+    console.log(`[auth] fetchUserDataFromSeat start`, { characterId });
     // 1) character sheet → user_id
     const sheet = await seatApiService.getCharacterSheet(characterId);
-    const seatUserId = sheet?.user_id;
+    if (!sheet) {
+      console.error(`Could not load character sheet for ${characterId}`);
+      return null;
+    }
+    console.log(`[auth] sheet`, {
+      characterId: sheet.character_id,
+      userId: sheet.user_id,
+      corpId: sheet.corporation?.entity_id,
+      corpName: sheet.corporation?.name,
+      allianceId: sheet.alliance?.entity_id,
+      allianceName: sheet.alliance?.name,
+    });
+    const seatUserId = sheet.user_id;
     if (!seatUserId) {
       console.error(`Could not find SeAT user for character ${characterId}`);
       return null;
@@ -142,16 +155,37 @@ async function fetchUserDataFromSeat(characterId: number): Promise<SessionUserDa
       console.error(`SeAT user ${seatUserId} not found for character ${characterId}`);
       return null;
     }
+    console.log(`[auth] userInfo`, {
+      seatUserId,
+      associatedCharacterIds: userInfo.associated_character_ids,
+      mainCharacterId: userInfo.main_character_id,
+    });
     const associatedCharacterIds = userInfo.associated_character_ids || [];
-    const mainCharacterId = userInfo.main_character_id || characterId;
+    const mainCharacterId = userInfo.main_character_id;
 
     // 3) main character sheet → name/corp/alliance
-    const mainSheet = await seatApiService.getCharacterSheet(mainCharacterId);
-    const mainCharacterName = mainSheet?.name || `Character_${mainCharacterId}`;
-    const mainCharacterCorporationId = mainSheet?.corporation_id;
-    const mainCharacterCorporationName = mainSheet?.corporation?.name;
-    const mainCharacterAllianceId = mainSheet?.alliance_id;
-    const mainCharacterAllianceName = mainSheet?.alliance?.name;
+    // skip if main character is the same as the logged-in character
+    let mainSheet = sheet;
+    if (mainCharacterId !== characterId) {
+      const fetchedMainSheet = await seatApiService.getCharacterSheet(mainCharacterId);
+      if (!fetchedMainSheet) {
+        console.error(`Could not load main character sheet for ${mainCharacterId}`);
+        return null;
+      }
+      mainSheet = fetchedMainSheet;
+    }
+    console.log(`[auth] mainSheet`, {
+      characterId: mainSheet.character_id,
+      corpId: mainSheet.corporation?.entity_id,
+      corpName: mainSheet.corporation?.name,
+      allianceId: mainSheet.alliance?.entity_id,
+      allianceName: mainSheet.alliance?.name,
+    });
+    const mainCharacterName = mainSheet.name;
+    const mainCharacterCorporationId = mainSheet.corporation?.entity_id;
+    const mainCharacterCorporationName = mainSheet.corporation?.name;
+    const mainCharacterAllianceId = mainSheet.alliance?.entity_id;
+    const mainCharacterAllianceName = mainSheet.alliance?.name;
 
     const profileImageUrl = `https://images.evetech.net/characters/${mainCharacterId}/portrait?size=128`;
 
@@ -264,57 +298,6 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  // Test login route - ONLY available in development mode
-  app.get("/api/test-login", async (req: Request, res: Response) => {
-    const isDevelopment = process.env.NODE_ENV !== "production";
-    
-    if (!isDevelopment) {
-      return res.redirect("/?error=test_login_disabled");
-    }
-
-    try {
-      const characterIdParam = req.query.characterId as string;
-      if (!characterIdParam) {
-        return res.redirect("/?error=character_id_required");
-      }
-      
-      const testCharacterId = parseInt(characterIdParam, 10);
-      if (isNaN(testCharacterId)) {
-        return res.redirect("/?error=invalid_character_id");
-      }
-      
-      // Fetch user data from SeAT
-      const userData = await fetchUserDataFromSeat(testCharacterId);
-      
-      if (!userData) {
-        return res.redirect("/?error=seat_user_not_found");
-      }
-
-      // Create member role if no role exists (role can be changed via DB)
-      const existingRole = await storage.getUserRole(userData.seatUserId);
-      if (!existingRole) {
-        await storage.createUserRole({ seatUserId: userData.seatUserId, role: "member" });
-        console.log(`Created member role for seatUserId ${userData.seatUserId}`);
-      }
-
-      req.session.user = userData;
-      req.session.accessToken = `test_access_token_${Date.now()}`;
-      req.session.refreshToken = `test_refresh_token_${Date.now()}`;
-      req.session.tokenExpiry = Date.now() + 1200 * 1000;
-
-      console.log(`Test login: seatUserId=${userData.seatUserId}, characterName=${userData.mainCharacterName}`);
-
-      res.redirect("/");
-    } catch (error) {
-      console.error("Test login error:", error);
-      res.redirect("/?error=test_login_failed");
-    }
-  });
-
-  // Check if app is in development mode
-  app.get("/api/dev-mode", (req: Request, res: Response) => {
-    res.json({ isDevelopment: process.env.NODE_ENV !== "production" });
-  });
 }
 
 export const isAuthenticated: RequestHandler = async (req: Request, res: Response, next) => {
@@ -334,11 +317,6 @@ export const isAuthenticated: RequestHandler = async (req: Request, res: Respons
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // For test tokens, just extend expiry
-  if (refreshToken.startsWith("test_")) {
-    req.session.tokenExpiry = Date.now() + 1200 * 1000;
-    return next();
-  }
 
   try {
     const tokens = await refreshAccessToken(refreshToken);
