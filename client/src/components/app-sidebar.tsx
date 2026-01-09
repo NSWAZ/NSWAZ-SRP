@@ -7,7 +7,8 @@ import {
   Settings,
   Shield,
   Rocket,
-  Users
+  Users,
+  Wallet
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +36,7 @@ const memberItems = [
 const fcItems = [
   { title: "플릿 관리", url: "/fleet-management", icon: Users },
   { title: "요청 관리", url: "/all-requests", icon: ClipboardCheck },
+  { title: "지급 관리", url: "/payment-management", icon: Wallet },
 ];
 
 const adminItems = [

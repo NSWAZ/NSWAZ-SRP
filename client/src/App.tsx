@@ -20,6 +20,7 @@ import AllRequests from "@/pages/all-requests";
 import ShipTypes from "@/pages/ship-types";
 import RequestDetail from "@/pages/request-detail";
 import FleetManagement from "@/pages/fleet-management";
+import PaymentManagement from "@/pages/payment-management";
 
 function AuthenticatedRouter() {
   return (
@@ -30,6 +31,7 @@ function AuthenticatedRouter() {
       <Route path="/all-requests" component={AllRequests} />
       <Route path="/ship-types" component={ShipTypes} />
       <Route path="/fleet-management" component={FleetManagement} />
+      <Route path="/payment-management" component={PaymentManagement} />
       <Route path="/request/:id" component={RequestDetail} />
       <Route component={NotFound} />
     </Switch>
