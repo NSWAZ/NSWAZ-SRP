@@ -445,6 +445,22 @@ export class DatabaseStorage implements IStorage {
       ...data,
     }));
   }
+
+  // Mark multiple requests as paid atomically
+  async markRequestsAsPaid(requestIds: string[], byMainChar: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      for (const requestId of requestIds) {
+        await tx.insert(srpProcessLog).values({
+          id: crypto.randomUUID(),
+          srpRequestId: requestId,
+          processType: "pay",
+          occurredAt: new Date(),
+          byMainChar,
+          note: null,
+        });
+      }
+    });
+  }
 }
 
 export const storage = new DatabaseStorage();

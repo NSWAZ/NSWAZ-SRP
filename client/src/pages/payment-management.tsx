@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { Wallet, Copy, Check, ExternalLink } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Wallet, Copy, Check, CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Table,
   TableBody,
@@ -15,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Link } from "wouter";
 
 interface PaymentSummary {
   seatUserId: number;
@@ -39,10 +39,36 @@ function formatIsk(amount: number | null): string {
 export default function PaymentManagement() {
   const { toast } = useToast();
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [processingId, setProcessingId] = useState<number | null>(null);
 
   const { data: summaries, isLoading } = useQuery<PaymentSummary[]>({
     queryKey: ["/api/payment/summary"],
     refetchOnMount: "always",
+  });
+
+  const markPaidMutation = useMutation({
+    mutationFn: async (requestIds: string[]) => {
+      const response = await apiRequest("POST", "/api/payment/mark-paid", { requestIds });
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payment/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/srp-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({
+        title: "지급 완료",
+        description: `${variables.length}건의 요청이 지급 완료로 변경되었습니다.`,
+      });
+      setProcessingId(null);
+    },
+    onError: () => {
+      toast({
+        title: "오류",
+        description: "지급 상태 변경에 실패했습니다.",
+        variant: "destructive",
+      });
+      setProcessingId(null);
+    },
   });
 
   const totalAmount = summaries?.reduce((sum, s) => sum + s.totalPayout, 0) || 0;
@@ -65,6 +91,11 @@ export default function PaymentManagement() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleMarkPaid = (summary: PaymentSummary) => {
+    setProcessingId(summary.seatUserId);
+    markPaidMutation.mutate(summary.requestIds);
   };
 
   return (
@@ -100,7 +131,7 @@ export default function PaymentManagement() {
 
         <Card data-testid="card-total-requests">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">승인된 요청 수</CardTitle>
+            <CardTitle className="text-sm font-medium">지급 예정 요청 수</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-requests">{totalRequests}건</div>
@@ -131,9 +162,9 @@ export default function PaymentManagement() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>메인 캐릭터</TableHead>
-                    <TableHead className="text-center">승인된 요청</TableHead>
+                    <TableHead className="text-center">지급 예정 요청</TableHead>
                     <TableHead className="text-right">지급 필요 금액</TableHead>
-                    <TableHead className="text-right">작업</TableHead>
+                    <TableHead className="text-right">지급 확인</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -177,21 +208,25 @@ export default function PaymentManagement() {
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              asChild
-                              data-testid={`button-view-requests-${summary.seatUserId}`}
-                            >
-                              <Link href={`/all-requests?status=approved`}>
-                                <ExternalLink className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>승인된 요청 보기</TooltipContent>
-                        </Tooltip>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleMarkPaid(summary)}
+                          disabled={processingId === summary.seatUserId || markPaidMutation.isPending}
+                          data-testid={`button-mark-paid-${summary.seatUserId}`}
+                        >
+                          {processingId === summary.seatUserId ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              처리 중
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              지급 확인
+                            </>
+                          )}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -203,7 +238,7 @@ export default function PaymentManagement() {
               <Wallet className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
               <h3 className="mt-4 text-lg font-semibold">지급 대기 없음</h3>
               <p className="mt-2 text-muted-foreground">
-                현재 승인 대기 중인 지급 요청이 없습니다
+                현재 지급 예정인 요청이 없습니다
               </p>
             </div>
           )}

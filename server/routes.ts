@@ -667,6 +667,29 @@ export async function registerRoutes(
     }
   });
 
+  // Mark requests as paid - Admin only (atomic transaction)
+  app.post("/api/payment/mark-paid", isAuthenticated, requireRole("admin"), async (req: Request, res) => {
+    try {
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { requestIds } = req.body;
+      
+      if (!Array.isArray(requestIds) || requestIds.length === 0) {
+        return res.status(400).json({ message: "requestIds must be a non-empty array" });
+      }
+
+      await storage.markRequestsAsPaid(requestIds, user.mainCharacterName);
+      
+      res.json({ success: true, markedCount: requestIds.length });
+    } catch (error) {
+      console.error("Error marking requests as paid:", error);
+      res.status(500).json({ message: "Failed to mark requests as paid" });
+    }
+  });
+
   return httpServer;
 }
 
