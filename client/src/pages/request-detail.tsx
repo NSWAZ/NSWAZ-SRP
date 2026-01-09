@@ -394,40 +394,38 @@ export default function RequestDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start gap-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                  <FileText className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">요청 제출됨</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(request.createdAt)}
-                  </p>
-                </div>
-              </div>
-              {request.reviewedAt && (
-                <div className="flex items-start gap-4">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                    request.status === "approved" ? "bg-green-100 dark:bg-green-900" : "bg-red-100 dark:bg-red-900"
-                  }`}>
-                    {request.status === "approved" ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-600" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium">
-                      {request.status === "approved" ? "승인됨" : "거부됨"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(request.reviewedAt)}
-                    </p>
-                    {request.reviewerNote && (
-                      <p className="mt-1 text-sm italic">"{request.reviewerNote}"</p>
-                    )}
-                  </div>
-                </div>
+              {request.processLogs && request.processLogs.length > 0 ? (
+                [...request.processLogs].reverse().map((log, index) => {
+                  const getLogStyle = (type: string) => {
+                    switch (type) {
+                      case "created": return { icon: <FileText className="h-4 w-4 text-primary" />, bg: "bg-primary/10", label: "요청 제출됨" };
+                      case "approve": return { icon: <CheckCircle className="h-4 w-4 text-green-600" />, bg: "bg-green-100 dark:bg-green-900", label: "승인됨" };
+                      case "deny": return { icon: <XCircle className="h-4 w-4 text-red-600" />, bg: "bg-red-100 dark:bg-red-900", label: "거부됨" };
+                      case "pay": return { icon: <CheckCircle className="h-4 w-4 text-blue-600" />, bg: "bg-blue-100 dark:bg-blue-900", label: "지급 완료" };
+                      default: return { icon: <Clock className="h-4 w-4 text-muted-foreground" />, bg: "bg-muted", label: type };
+                    }
+                  };
+                  const style = getLogStyle(log.processType);
+                  return (
+                    <div key={index} className="flex items-start gap-4">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${style.bg}`}>
+                        {style.icon}
+                      </div>
+                      <div>
+                        <p className="font-medium">{style.label}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(log.occurredAt)}
+                          {log.byMainChar && ` · ${log.byMainChar}`}
+                        </p>
+                        {log.note && (
+                          <p className="mt-1 text-sm italic">"{log.note}"</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">타임라인 정보가 없습니다</p>
               )}
             </CardContent>
           </Card>
