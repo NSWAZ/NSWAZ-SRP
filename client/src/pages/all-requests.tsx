@@ -204,10 +204,35 @@ export default function AllRequests() {
 
   const handleReview = () => {
     if (!reviewDialog.request || !reviewDialog.action) return;
+    
+    let finalNote = reviewNote;
+    
+    if (reviewDialog.action === "approve" && calculatedPayout) {
+      const { baseValue, operationMultiplier, finalAmount, maxPayout, isSpecialRole, isSpecialShipClass } = calculatedPayout.breakdown;
+      const operationType = reviewDialog.request.operationType;
+      
+      let calculationParts: string[] = [];
+      
+      if (operationType === "fleet") {
+        calculationParts.push(isSpecialRole ? "플릿 + 특수롤 (100%)" : "플릿 (50%)");
+      } else {
+        calculationParts.push(isSpecialShipClass ? "솔로잉 + 지원함급 (100%)" : "솔로잉 (25%)");
+      }
+      
+      const calculatedAmount = baseValue * operationMultiplier;
+      if (finalAmount < calculatedAmount && maxPayout < calculatedAmount) {
+        const reductionPercent = Math.round((1 - finalAmount / calculatedAmount) * 100);
+        calculationParts.push(`함급 제한 -${reductionPercent}%`);
+      }
+      
+      const calculationNote = calculationParts.join(" ");
+      finalNote = reviewNote ? `${calculationNote}\n${reviewNote}` : calculationNote;
+    }
+    
     reviewMutation.mutate({
       id: reviewDialog.request.id,
       action: reviewDialog.action,
-      note: reviewNote,
+      note: finalNote,
       payout: reviewDialog.action === "approve" ? payoutAmount : undefined,
     });
   };
