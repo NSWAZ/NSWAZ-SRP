@@ -1,10 +1,26 @@
 import { useState, useEffect } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, FlaskConical } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import backgroundImage from "@assets/Nag1_1766304787177.png";
+
+const DEV_TEST_CHARACTERS = {
+  admin: { id: 2119654917, name: "Admin" },
+  fc: { id: 96510715, name: "FC" },
+  member: { id: 2113199519, name: "Member" },
+} as const;
 
 export default function Landing() {
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [devDialogOpen, setDevDialogOpen] = useState(false);
+  const isDev = import.meta.env.DEV;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -106,6 +122,47 @@ export default function Landing() {
                   className="h-auto"
                 />
               </a>
+
+              {isDev && (
+                <Dialog open={devDialogOpen} onOpenChange={setDevDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="gap-2 bg-yellow-500/20 border-yellow-500/50 text-yellow-300 hover:bg-yellow-500/30"
+                      data-testid="button-dev-login"
+                    >
+                      <FlaskConical className="h-4 w-4" />
+                      Test Login
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-xs">
+                    <DialogHeader>
+                      <DialogTitle>Select Test Role</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-2">
+                      {(Object.keys(DEV_TEST_CHARACTERS) as Array<keyof typeof DEV_TEST_CHARACTERS>).map((role) => (
+                        <Button
+                          key={role}
+                          variant="outline"
+                          className="justify-start gap-2"
+                          onClick={() => {
+                            window.location.href = `/api/auth/dev-login?characterId=${DEV_TEST_CHARACTERS[role].id}`;
+                          }}
+                          data-testid={`button-dev-login-${role}`}
+                        >
+                          <img
+                            src={`https://images.evetech.net/characters/${DEV_TEST_CHARACTERS[role].id}/portrait?size=32`}
+                            alt={DEV_TEST_CHARACTERS[role].name}
+                            className="h-6 w-6 rounded"
+                          />
+                          <span className="capitalize">{role}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </div>
         </main>
