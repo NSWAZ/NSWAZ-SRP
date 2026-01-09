@@ -19,7 +19,16 @@ import { eq, desc, and, sql, count, gte } from "drizzle-orm";
 import { shipCatalogService } from "./services/shipCatalog";
 
 // Status-changing process types (not including 'updated' event)
-const STATUS_PROCESS_TYPES = ["created", "approved", "denied", "paid"];
+// Process types: created, approve, deny, pay
+const STATUS_PROCESS_TYPES = ["created", "approve", "deny", "pay"];
+
+// Map process type to status
+const PROCESS_TO_STATUS: Record<string, SrpStatus> = {
+  created: "pending",
+  approve: "approved",
+  deny: "denied",
+  pay: "paid",
+};
 
 // Helper to derive status from process logs
 // Flow: pending → approved/denied → paid
@@ -29,8 +38,7 @@ function deriveStatusFromLogs(logs: SrpProcessLog[]): SrpStatus {
   // Find the latest status-changing log (ignore 'updated' events)
   for (const log of logs) {
     if (STATUS_PROCESS_TYPES.includes(log.processType)) {
-      if (log.processType === "created") return "pending";
-      return log.processType as SrpStatus;
+      return PROCESS_TO_STATUS[log.processType] || "pending";
     }
   }
   return "pending";
@@ -368,7 +376,7 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(srpProcessLog)
       .where(and(
-        eq(srpProcessLog.processType, "approved"),
+        eq(srpProcessLog.processType, "approve"),
         gte(srpProcessLog.occurredAt, today)
       ));
 

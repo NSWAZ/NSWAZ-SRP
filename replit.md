@@ -49,7 +49,7 @@ The system features a dashboard with statistics, request submission forms, reque
 - `user_roles` - Role assignments by seatUserId (member, fc, admin)
 - `fleets` - Fleet operations created by FC/admin users (references createdBySeatUserId)
 - `srp_requests` - SRP request submissions with status tracking (references seatUserId for ownership)
-- `srp_process_log` - Audit log tracking all SRP request state changes (created, approved, denied, paid) with timestamps and actor names. Status is derived from the latest process log entry.
+- `srp_process_log` - Audit log tracking all SRP request state changes with timestamps and actor names. Process types: created (pending), approve (approved), deny (denied), pay (paid), updated (info change event). Status is derived from the latest process log entry.
 
 ### Role-Based Access Control
 - **member**: Can submit requests and view their own requests
