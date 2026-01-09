@@ -380,7 +380,7 @@ export class DatabaseStorage implements IStorage {
         gte(srpProcessLog.occurredAt, today)
       ));
 
-    // GLOBAL: Average processing time (time between 'created' and 'approved'/'denied' logs)
+    // GLOBAL: Average processing time (time between 'created' and 'approve'/'deny' logs)
     const avgResults = await db
       .select({ 
         avg: sql<number>`
@@ -389,7 +389,7 @@ export class DatabaseStorage implements IStorage {
              FROM srp_process_log created_log
              JOIN srp_process_log review_log ON created_log.srp_request_id = review_log.srp_request_id
              WHERE created_log.process_type = 'created' 
-               AND review_log.process_type IN ('approved', 'denied')),
+               AND review_log.process_type IN ('approve', 'deny')),
             0
           )
         ` 

@@ -594,8 +594,10 @@ export async function registerRoutes(
       const { id } = req.params;
       const { status, reviewerNote, payoutAmount } = req.body;
 
+      console.log("Review request received:", { status, reviewerNote, payoutAmount });
+
       if (!["approve", "deny"].includes(status)) {
-        return res.status(400).json({ message: "Invalid status" });
+        return res.status(400).json({ message: `Invalid status: ${status}` });
       }
 
       // Check if request exists
