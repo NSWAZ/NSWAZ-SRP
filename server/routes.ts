@@ -572,7 +572,7 @@ export async function registerRoutes(
         }
       }
       
-      const request = await storage.createSrpRequest(user.seatUserId, validated);
+      const request = await storage.createSrpRequest(user.seatUserId, user.mainCharacterName, validated);
       res.status(201).json(request);
     } catch (error) {
       if (error instanceof z.ZodError) {

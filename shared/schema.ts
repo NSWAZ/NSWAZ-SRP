@@ -10,6 +10,7 @@ export * from "./models/auth";
 export const userRoleEnum = pgEnum("user_role", ["member", "fc", "admin"]);
 export const srpStatusEnum = pgEnum("srp_status", ["pending", "approved", "denied", "processing"]);
 export const operationTypeEnum = pgEnum("operation_type", ["solo", "fleet"]);
+export const srpProcessTypeEnum = pgEnum("srp_process_type", ["created", "approved", "denied", "processing", "paid", "updated"]);
 
 // User roles table - maps SeAT user ID to role
 export const userRoles = pgTable("user_roles", {
@@ -55,23 +56,41 @@ export const srpRequests = pgTable("srp_requests", {
   lossDescription: text("loss_description"),
   fleetId: varchar("fleet_id"),
   status: srpStatusEnum("status").notNull().default("pending"),
-  reviewerName: text("reviewer_name"),
-  reviewerNote: text("reviewer_note"),
   payoutAmount: integer("payout_amount"),
-  createdAt: timestamp("created_at").defaultNow(),
-  paidAt: timestamp("paid_at"),
-  reviewedAt: timestamp("reviewed_at"),
 }, (table) => [
   index("idx_srp_requests_seat_user_id").on(table.seatUserId),
   index("idx_srp_requests_status").on(table.status),
-  index("idx_srp_requests_created_at").on(table.createdAt),
   index("idx_srp_requests_victim_character").on(table.victimCharacterId),
   uniqueIndex("idx_srp_requests_killmail_id_unique").on(table.killmailId),
+]);
+
+// SRP Process Log table - tracks all state changes
+export const srpProcessLog = pgTable("srp_process_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  srpRequestId: varchar("srp_request_id").notNull().references(() => srpRequests.id),
+  processType: srpProcessTypeEnum("process_type").notNull(),
+  occurredAt: timestamp("occurred_at").defaultNow(),
+  byMainChar: text("by_main_char").notNull(),
+  note: text("note"),
+}, (table) => [
+  index("idx_srp_process_log_request_id").on(table.srpRequestId),
+  index("idx_srp_process_log_occurred_at").on(table.occurredAt),
 ]);
 
 export const userRolesRelations = relations(userRoles, ({ }) => ({}));
 
 export const fleetsRelations = relations(fleets, ({ }) => ({}));
+
+export const srpRequestsRelations = relations(srpRequests, ({ many }) => ({
+  processLogs: many(srpProcessLog),
+}));
+
+export const srpProcessLogRelations = relations(srpProcessLog, ({ one }) => ({
+  srpRequest: one(srpRequests, {
+    fields: [srpProcessLog.srpRequestId],
+    references: [srpRequests.id],
+  }),
+}));
 
 // Insert schemas
 export const insertUserRoleSchema = createInsertSchema(userRoles).omit({ id: true });
@@ -86,13 +105,13 @@ export const insertSrpRequestSchema = createInsertSchema(srpRequests, {
 }).omit({ 
   id: true, 
   seatUserId: true,
-  createdAt: true, 
-  paidAt: true,
-  reviewedAt: true,
-  reviewerName: true,
-  reviewerNote: true,
   payoutAmount: true,
   status: true,
+});
+
+export const insertSrpProcessLogSchema = createInsertSchema(srpProcessLog).omit({ 
+  id: true, 
+  occurredAt: true,
 });
 
 // Fleet creation form schema
@@ -157,6 +176,8 @@ export type InsertFleet = z.infer<typeof insertFleetSchema>;
 export type FleetFormData = z.infer<typeof fleetFormSchema>;
 export type SrpRequest = typeof srpRequests.$inferSelect;
 export type InsertSrpRequest = z.infer<typeof insertSrpRequestSchema>;
+export type SrpProcessLog = typeof srpProcessLog.$inferSelect;
+export type InsertSrpProcessLog = z.infer<typeof insertSrpProcessLogSchema>;
 export type SrpRequestFormData = z.infer<typeof srpRequestFormSchema>;
 export type SrpCalculateRequest = z.infer<typeof srpCalculateSchema>;
 
@@ -177,6 +198,7 @@ export type SrpRequestWithDetails = SrpRequest & {
   shipData?: ShipData;
   pilotName?: string;
   fleet?: Fleet;
+  processLogs?: SrpProcessLog[];
 };
 
 export type DashboardStats = {
