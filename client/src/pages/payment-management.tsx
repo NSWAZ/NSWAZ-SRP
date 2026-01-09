@@ -78,32 +78,32 @@ export default function PaymentManagement() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card data-testid="card-total-amount">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">총 지급 필요 금액</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-total-amount">
               {formatIsk(totalAmount)}
             </div>
           </CardContent>
         </Card>
 
         <Card data-testid="card-total-users">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">지급 대상 인원</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}명</div>
+            <div className="text-2xl font-bold" data-testid="text-total-users">{totalUsers}명</div>
           </CardContent>
         </Card>
 
         <Card data-testid="card-total-requests">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">승인된 요청 수</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalRequests}건</div>
+            <div className="text-2xl font-bold" data-testid="text-total-requests">{totalRequests}건</div>
           </CardContent>
         </Card>
       </div>
@@ -146,13 +146,14 @@ export default function PaymentManagement() {
                               src={`https://images.evetech.net/characters/${summary.mainCharacterId}/portrait?size=32`}
                               alt=""
                               className="h-8 w-8 rounded-full"
+                              data-testid={`img-portrait-${summary.seatUserId}`}
                             />
                           )}
-                          <span className="font-medium">{summary.mainCharacterName}</span>
+                          <span className="font-medium" data-testid={`text-character-${summary.seatUserId}`}>{summary.mainCharacterName}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="secondary">{summary.requestCount}건</Badge>
+                        <Badge variant="secondary" data-testid={`badge-request-count-${summary.seatUserId}`}>{summary.requestCount}건</Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Tooltip>
