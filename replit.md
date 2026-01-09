@@ -49,6 +49,7 @@ The system features a dashboard with statistics, request submission forms, reque
 - `user_roles` - Role assignments by seatUserId (member, fc, admin)
 - `fleets` - Fleet operations created by FC/admin users (references createdBySeatUserId)
 - `srp_requests` - SRP request submissions with status tracking (references seatUserId for ownership)
+- `srp_process_log` - Audit log tracking all SRP request state changes (created, approved, denied, processing, paid) with timestamps and actor names
 
 ### Role-Based Access Control
 - **member**: Can submit requests and view their own requests
