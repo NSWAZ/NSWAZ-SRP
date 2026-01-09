@@ -206,6 +206,54 @@ async function fetchUserDataFromSeat(characterId: number): Promise<SessionUserDa
   }
 }
 
+interface ProcessLoginResult {
+  success: boolean;
+  error?: string;
+  userData?: SessionUserData;
+}
+
+async function processLoginAfterCharacterFetch(userData: SessionUserData | null): Promise<ProcessLoginResult> {
+  if (!userData) {
+    return { success: false, error: "seat_user_not_found" };
+  }
+
+  // Check corp/alliance restrictions
+  const allowedCorpIds = process.env.ALLOWED_CORP_IDS?.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) || [];
+  const allowedAllianceIds = process.env.ALLOWED_ALLIANCE_IDS?.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) || [];
+  
+  const hasRestrictions = allowedCorpIds.length > 0 || allowedAllianceIds.length > 0;
+  if (hasRestrictions) {
+    const isAllowedCorp = allowedCorpIds.length > 0 && userData.mainCharacterCorporationId && allowedCorpIds.includes(userData.mainCharacterCorporationId);
+    const isAllowedAlliance = allowedAllianceIds.length > 0 && userData.mainCharacterAllianceId && allowedAllianceIds.includes(userData.mainCharacterAllianceId);
+    
+    if (!isAllowedCorp && !isAllowedAlliance) {
+      console.log(`Access denied for ${userData.mainCharacterName}: corp=${userData.mainCharacterCorporationId}, alliance=${userData.mainCharacterAllianceId}`);
+      return { success: false, error: "access_denied" };
+    }
+  }
+
+  return { success: true, userData };
+}
+
+function setupSessionAfterLogin(
+  req: Request,
+  userData: SessionUserData,
+  tokens?: { access_token: string; refresh_token: string; expires_in: number }
+): void {
+  req.session.user = userData;
+  if (tokens) {
+    req.session.accessToken = tokens.access_token;
+    req.session.refreshToken = tokens.refresh_token;
+    req.session.tokenExpiry = Date.now() + tokens.expires_in * 1000;
+  } else {
+    // Dev bypass: set dummy token data with long expiry
+    req.session.accessToken = "dev_bypass_token";
+    req.session.refreshToken = "dev_bypass_refresh";
+    req.session.tokenExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 1 week
+  }
+  console.log(`User logged in: seatUserId=${userData.seatUserId}, characterName=${userData.mainCharacterName}`);
+}
+
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
@@ -252,34 +300,18 @@ export async function setupAuth(app: Express) {
       const tokens = await exchangeCodeForToken(code, redirectUri);
       const characterInfo = await getCharacterInfo(tokens.access_token);
 
-      // Fetch user data from SeAT and store in session
+      // Fetch user data from SeAT
       const userData = await fetchUserDataFromSeat(characterInfo.CharacterID);
       
-      if (!userData) {
-        return res.redirect("/?error=seat_user_not_found");
-      }
-
-      // Check corp/alliance restrictions
-      const allowedCorpIds = process.env.ALLOWED_CORP_IDS?.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) || [];
-      const allowedAllianceIds = process.env.ALLOWED_ALLIANCE_IDS?.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) || [];
+      // Process login (check restrictions, etc.)
+      const result = await processLoginAfterCharacterFetch(userData);
       
-      const hasRestrictions = allowedCorpIds.length > 0 || allowedAllianceIds.length > 0;
-      if (hasRestrictions) {
-        const isAllowedCorp = allowedCorpIds.length > 0 && userData.mainCharacterCorporationId && allowedCorpIds.includes(userData.mainCharacterCorporationId);
-        const isAllowedAlliance = allowedAllianceIds.length > 0 && userData.mainCharacterAllianceId && allowedAllianceIds.includes(userData.mainCharacterAllianceId);
-        
-        if (!isAllowedCorp && !isAllowedAlliance) {
-          console.log(`Access denied for ${userData.mainCharacterName}: corp=${userData.mainCharacterCorporationId}, alliance=${userData.mainCharacterAllianceId}`);
-          return res.redirect("/?error=access_denied");
-        }
+      if (!result.success || !result.userData) {
+        return res.redirect(`/?error=${result.error}`);
       }
 
-      req.session.user = userData;
-      req.session.accessToken = tokens.access_token;
-      req.session.refreshToken = tokens.refresh_token;
-      req.session.tokenExpiry = Date.now() + tokens.expires_in * 1000;
-
-      console.log(`User logged in: seatUserId=${userData.seatUserId}, characterName=${userData.mainCharacterName}`);
+      // Setup session with tokens
+      setupSessionAfterLogin(req, result.userData, tokens);
 
       res.redirect("/");
     } catch (error) {
@@ -287,6 +319,45 @@ export async function setupAuth(app: Express) {
       res.redirect("/?error=auth_failed");
     }
   });
+
+  // Development mode SSO bypass
+  if (process.env.NODE_ENV === "development") {
+    app.get("/api/auth/dev-login", async (req: Request, res: Response) => {
+      try {
+        const { characterId } = req.query;
+        
+        if (!characterId || typeof characterId !== "string") {
+          return res.status(400).json({ message: "characterId query parameter required" });
+        }
+
+        const charId = parseInt(characterId, 10);
+        if (isNaN(charId)) {
+          return res.status(400).json({ message: "Invalid characterId" });
+        }
+
+        console.log(`[dev-login] Attempting dev login with characterId: ${charId}`);
+
+        // Fetch user data from SeAT (same as regular SSO flow)
+        const userData = await fetchUserDataFromSeat(charId);
+        
+        // Process login (check restrictions, etc.) - same logic as regular SSO
+        const result = await processLoginAfterCharacterFetch(userData);
+        
+        if (!result.success || !result.userData) {
+          return res.redirect(`/?error=${result.error}`);
+        }
+
+        // Setup session without real tokens (dev bypass)
+        setupSessionAfterLogin(req, result.userData);
+
+        console.log(`[dev-login] Dev login successful for ${result.userData.mainCharacterName}`);
+        res.redirect("/");
+      } catch (error) {
+        console.error("Dev login error:", error);
+        res.redirect("/?error=dev_auth_failed");
+      }
+    });
+  }
 
   // Logout route
   app.get("/api/logout", (req: Request, res: Response) => {
