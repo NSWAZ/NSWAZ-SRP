@@ -122,7 +122,7 @@ export default function AllRequests() {
       payout?: number;
     }) => {
       return apiRequest("PATCH", `/api/srp-requests/${id}/review`, {
-        status: action === "approve" ? "approved" : "denied",
+        status: action,
         reviewerNote: note,
         payoutAmount: action === "approve" ? payout : undefined,
       });
