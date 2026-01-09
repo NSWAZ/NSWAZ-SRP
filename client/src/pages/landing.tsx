@@ -12,9 +12,9 @@ import {
 import backgroundImage from "@assets/Nag1_1766304787177.png";
 
 const DEV_TEST_CHARACTERS = {
-  admin: { id: 2119654917, name: "Admin" },
-  fc: { id: 96510715, name: "FC" },
-  member: { id: 2113199519, name: "Member" },
+  admin: { id: 96386549, name: "Admin" },
+  fc: { id: 94403590, name: "FC" },
+  member: { id: 2118572169, name: "Member" },
 } as const;
 
 export default function Landing() {
