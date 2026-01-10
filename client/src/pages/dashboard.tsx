@@ -138,8 +138,8 @@ export default function Dashboard() {
           loading={statsLoading}
         />
         <StatCard
-          title="오늘 승인된 요청 수"
-          value={stats?.approvedToday ?? 0}
+          title="이번 달 처리된 요청 수"
+          value={stats?.paidThisMonth ?? 0}
           icon={CheckCircle}
           loading={statsLoading}
           isSiteWide

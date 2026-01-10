@@ -205,7 +205,7 @@ export type SrpRequestWithDetails = SrpRequest & {
 
 export type DashboardStats = {
   pendingCount: number;
-  approvedToday: number;
+  paidThisMonth: number;
   totalPaidOut: number;
   averageProcessingHours: number;
 };

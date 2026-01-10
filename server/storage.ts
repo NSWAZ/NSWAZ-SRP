@@ -372,15 +372,16 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // GLOBAL: Approved today (count 'approved' process logs from today)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const [{ count: approvedToday }] = await db
+    // GLOBAL: Paid this month (count 'pay' process logs from this month)
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const [{ count: paidThisMonth }] = await db
       .select({ count: count() })
       .from(srpProcessLog)
       .where(and(
-        eq(srpProcessLog.processType, "approve"),
-        gte(srpProcessLog.occurredAt, today)
+        eq(srpProcessLog.processType, "pay"),
+        gte(srpProcessLog.occurredAt, startOfMonth)
       ));
 
     // GLOBAL: Average processing time (time between 'created' and 'pay' logs)
@@ -403,7 +404,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       pendingCount,
-      approvedToday: Number(approvedToday) || 0,
+      paidThisMonth: Number(paidThisMonth) || 0,
       totalPaidOut,
       averageProcessingHours: Math.round(Number(avgResult?.avg) || 0),
     };
