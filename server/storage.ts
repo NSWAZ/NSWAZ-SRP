@@ -372,27 +372,28 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // GLOBAL: Approved today (count 'approved' process logs from today)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const [{ count: approvedToday }] = await db
+    // GLOBAL: Paid this month (count 'pay' process logs from this month)
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const [{ count: paidThisMonth }] = await db
       .select({ count: count() })
       .from(srpProcessLog)
       .where(and(
-        eq(srpProcessLog.processType, "approve"),
-        gte(srpProcessLog.occurredAt, today)
+        eq(srpProcessLog.processType, "pay"),
+        gte(srpProcessLog.occurredAt, startOfMonth)
       ));
 
-    // GLOBAL: Average processing time (time between 'created' and 'approve'/'deny' logs)
+    // GLOBAL: Average processing time (time between 'created' and 'pay' logs)
     const avgResults = await db
       .select({ 
         avg: sql<number>`
           COALESCE(
-            (SELECT AVG(EXTRACT(EPOCH FROM (review_log.occurred_at - created_log.occurred_at)) / 3600)
+            (SELECT AVG(EXTRACT(EPOCH FROM (paid_log.occurred_at - created_log.occurred_at)) / 3600)
              FROM srp_process_log created_log
-             JOIN srp_process_log review_log ON created_log.srp_request_id = review_log.srp_request_id
+             JOIN srp_process_log paid_log ON created_log.srp_request_id = paid_log.srp_request_id
              WHERE created_log.process_type = 'created' 
-               AND review_log.process_type IN ('approve', 'deny')),
+               AND paid_log.process_type = 'pay'),
             0
           )
         ` 
@@ -403,7 +404,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       pendingCount,
-      approvedToday: Number(approvedToday) || 0,
+      paidThisMonth: Number(paidThisMonth) || 0,
       totalPaidOut,
       averageProcessingHours: Math.round(Number(avgResult?.avg) || 0),
     };

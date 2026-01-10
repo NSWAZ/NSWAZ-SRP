@@ -138,14 +138,14 @@ export default function Dashboard() {
           loading={statsLoading}
         />
         <StatCard
-          title="오늘 승인된 요청 수"
-          value={stats?.approvedToday ?? 0}
+          title="이번 달 지급된 요청 수"
+          value={stats?.paidThisMonth ?? 0}
           icon={CheckCircle}
           loading={statsLoading}
           isSiteWide
         />
         <StatCard
-          title="평균 처리 시간"
+          title="평균 지급 시간"
           value={stats ? `${stats.averageProcessingHours}h` : "0h"}
           icon={Timer}
           loading={statsLoading}
@@ -223,10 +223,12 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm">{formatIsk(request.iskAmount)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm">{formatIsk(request.payoutAmount || 0)}</span>
                       <Badge variant={getStatusVariant(request.status)} className={getStatusClassName(request.status)}>
-                        {getStatusLabel(request.status)}
+                        {request.status === "paid" ? "지급됨" : 
+                         request.status === "approved" ? "지급 예정" : 
+                         request.status === "denied" ? "거부됨" : "심사 중"}
                       </Badge>
                     </div>
                   </div>
