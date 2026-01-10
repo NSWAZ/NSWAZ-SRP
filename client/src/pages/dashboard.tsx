@@ -138,14 +138,14 @@ export default function Dashboard() {
           loading={statsLoading}
         />
         <StatCard
-          title="이번 달 처리된 요청 수"
+          title="이번 달 지급된 요청 수"
           value={stats?.paidThisMonth ?? 0}
           icon={CheckCircle}
           loading={statsLoading}
           isSiteWide
         />
         <StatCard
-          title="평균 처리 시간"
+          title="평균 지급 시간"
           value={stats ? `${stats.averageProcessingHours}h` : "0h"}
           icon={Timer}
           loading={statsLoading}
