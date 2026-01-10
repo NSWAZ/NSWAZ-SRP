@@ -223,10 +223,14 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm">{formatIsk(request.iskAmount)}</span>
+                    <div className="flex items-center gap-2">
                       <Badge variant={getStatusVariant(request.status)} className={getStatusClassName(request.status)}>
-                        {getStatusLabel(request.status)}
+                        <span className="font-mono">{formatIsk(request.payoutAmount || 0)}</span>
+                        <span className="ml-1">
+                          {request.status === "paid" ? "지급됨" : 
+                           request.status === "approved" ? "지급 예정" : 
+                           request.status === "denied" ? "거부됨" : "심사 중"}
+                        </span>
                       </Badge>
                     </div>
                   </div>
